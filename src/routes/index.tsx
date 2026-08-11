@@ -1,18 +1,21 @@
 import { createFileRoute } from "@tanstack/react-router"
 
 import { ChannelStrip } from "#/components/channel-strip"
+import { ConfirmSharedMixDialog } from "#/components/confirm-shared-mix-dialog"
 import { MasterDock } from "#/components/master-dock"
 import { PresetControls } from "#/components/preset-controls"
 import { ShareMixButton } from "#/components/share-mix-button"
 import { TrackLibrary } from "#/components/track-library"
 import type { TrackId } from "#/data/tracks"
 import { useFocusMixer } from "#/hooks/use-focus-mixer"
+import { dismissSharedMix, usePendingSharedMix } from "#/lib/mixer-store"
 
 export const Route = createFileRoute("/")({ component: Home })
 
 /** Renders the complete local-first focus audio mixing desk. */
 function Home() {
   const mixer = useFocusMixer()
+  const pendingSharedMix = usePendingSharedMix()
   const activeTrackIds = new Set<TrackId>(
     mixer.channels.map((channel) => channel.trackId),
   )
@@ -20,6 +23,11 @@ function Home() {
 
   return (
     <div className="grid h-dvh w-full grid-rows-[auto_minmax(0,1fr)] gap-[clamp(0.65rem,1.6vh,1rem)] overflow-hidden p-[clamp(0.75rem,2vw,1.5rem)]">
+      <ConfirmSharedMixDialog
+        mix={pendingSharedMix}
+        onApply={mixer.applySharedMix}
+        onDismiss={dismissSharedMix}
+      />
       <a
         className="fixed top-3 left-3 z-[100] translate-y-[-150%] rounded-[0.65rem] bg-[var(--ink)] px-4 py-3 text-[var(--surface)] transition-transform duration-100 ease-[var(--ease-out)] focus:translate-y-0"
         href="#mixer"

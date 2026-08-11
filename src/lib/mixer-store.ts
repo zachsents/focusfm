@@ -2,7 +2,7 @@ import { useSyncExternalStore } from "react"
 import { z } from "zod"
 
 import { TRACK_IDS } from "#/data/tracks"
-import { getSharedMixFromLocation } from "#/lib/share-mix"
+import { getSharedMixFromLocation, type SharedMix } from "#/lib/share-mix"
 import { DEFAULT_BPM, MAX_BPM, MIN_BPM } from "#/lib/transport"
 
 const channelSchema = z.object({
@@ -115,26 +115,17 @@ const SERVER_SNAPSHOT: MixerSnapshot = {
 
 let clientSnapshot: MixerSnapshot | undefined
 const listeners = new Set<() => void>()
+let clientSharedMix: SharedMix | undefined
+let hasReadSharedMix = false
+const sharedMixListeners = new Set<() => void>()
 
 /** Reads and validates the locally stored mixer state once per page load. */
 function getClientSnapshot(): MixerSnapshot {
   if (clientSnapshot) return clientSnapshot
   if (typeof window === "undefined") return DEFAULT_SNAPSHOT
 
-  const sharedMix = getSharedMixFromLocation(window.location)
   const localSnapshot = getStoredSnapshot()
-  clientSnapshot = sharedMix
-    ? {
-        ...localSnapshot,
-        channels: sharedMix.channels.map((channel, index) => ({
-          ...channel,
-          id: `shared-${channel.trackId}-${index}`,
-        })),
-        masterVolume: sharedMix.masterVolume,
-        bpm: sharedMix.bpm,
-        activePresetId: null,
-      }
-    : localSnapshot
+  clientSnapshot = localSnapshot
   return clientSnapshot
 }
 
@@ -165,6 +156,27 @@ function subscribe(listener: () => void) {
   return () => listeners.delete(listener)
 }
 
+/** Reads the shared mix once after hydration so the listener can approve it. */
+function getClientSharedMix() {
+  if (hasReadSharedMix) return clientSharedMix
+  if (typeof window === "undefined") return undefined
+
+  clientSharedMix = getSharedMixFromLocation(window.location)
+  hasReadSharedMix = true
+  return clientSharedMix
+}
+
+/** Keeps shared-link state out of the server render. */
+function getServerSharedMix() {
+  return undefined
+}
+
+/** Subscribes React to dismissal of the pending shared mix. */
+function subscribeToSharedMix(listener: () => void) {
+  sharedMixListeners.add(listener)
+  return () => sharedMixListeners.delete(listener)
+}
+
 /** Persists the next snapshot and synchronously informs subscribers. */
 export function setMixerSnapshot(nextSnapshot: MixerSnapshot) {
   clientSnapshot = nextSnapshot
@@ -172,7 +184,28 @@ export function setMixerSnapshot(nextSnapshot: MixerSnapshot) {
   listeners.forEach((listener) => listener())
 }
 
+/** Removes the shared payload once it has been accepted or dismissed. */
+export function dismissSharedMix() {
+  if (typeof window === "undefined") return
+
+  const url = new URL(window.location.href)
+  url.searchParams.delete("mix")
+  window.history.replaceState(null, "", url)
+  clientSharedMix = undefined
+  hasReadSharedMix = true
+  sharedMixListeners.forEach((listener) => listener())
+}
+
 /** Returns the browser-local mixer state as a React external store. */
 export function useMixerSnapshot() {
   return useSyncExternalStore(subscribe, getClientSnapshot, getServerSnapshot)
+}
+
+/** Returns the validated shared mix awaiting the listener's approval. */
+export function usePendingSharedMix() {
+  return useSyncExternalStore(
+    subscribeToSharedMix,
+    getClientSharedMix,
+    getServerSharedMix,
+  )
 }

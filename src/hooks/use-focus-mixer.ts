@@ -3,12 +3,14 @@ import { useRef, useState } from "react"
 import type { TrackId } from "#/data/tracks"
 import { AudioEngine } from "#/lib/audio-engine"
 import {
+  dismissSharedMix,
   setMixerSnapshot,
   useMixerSnapshot,
   type MixerChannel,
   type MixerPreset,
   type MixerSnapshot,
 } from "#/lib/mixer-store"
+import type { SharedMix } from "#/lib/share-mix"
 import { clampBpm } from "#/lib/transport"
 
 /** Writes a complete mixer state to the local external store. */
@@ -245,6 +247,26 @@ export function useFocusMixer() {
     })
   }
 
+  const applySharedMix = (sharedMix: SharedMix) => {
+    const channels = sharedMix.channels.map((channel, index) => ({
+      ...channel,
+      id: `shared-${channel.trackId}-${index}`,
+    }))
+    updateSnapshot({
+      ...snapshot,
+      channels,
+      masterVolume: sharedMix.masterVolume,
+      bpm: sharedMix.bpm,
+      activePresetId: null,
+    })
+    dismissSharedMix()
+    if (isPlaying) {
+      void engineRef.current?.syncChannels(channels)
+      engineRef.current?.setMasterVolume(sharedMix.masterVolume)
+      engineRef.current?.setBpm(sharedMix.bpm)
+    }
+  }
+
   return {
     ...snapshot,
     isPlaying,
@@ -266,5 +288,6 @@ export function useFocusMixer() {
     savePresetChanges,
     discardPresetChanges,
     deletePreset,
+    applySharedMix,
   }
 }
