@@ -12,6 +12,7 @@ interface ChangelogEntry {
   hash: string
   message: string
   date: string
+  author: string
 }
 
 /** Reads recent commit subjects while Git metadata is available at build time. */
@@ -19,21 +20,24 @@ function readChangelog(): ChangelogEntry[] {
   try {
     return execFileSync(
       "git",
-      ["log", "-5", "--pretty=format:%h%x1f%s%x1f%cs"],
+      ["log", "-5", "--pretty=format:%h%x1f%s%x1f%cs%x1f%an"],
       { encoding: "utf8" },
     )
       .split("\n")
       .map((line) => {
-        const [hash, message, date] = line.split("\x1f")
-        return { hash, message, date }
+        const [hash, message, date, author] = line.split("\x1f")
+        return { hash, message, date, author }
       })
       .filter((entry): entry is ChangelogEntry =>
-        Boolean(entry.hash && entry.message && entry.date),
+        Boolean(entry.hash && entry.message && entry.date && entry.author),
       )
   } catch {
     const hash = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7)
     const message = process.env.VERCEL_GIT_COMMIT_MESSAGE
-    return hash && message ? [{ hash, message, date: "Latest release" }] : []
+    const author = process.env.VERCEL_GIT_COMMIT_AUTHOR_NAME ?? "Contributor"
+    return hash && message
+      ? [{ hash, message, date: "Latest release", author }]
+      : []
   }
 }
 

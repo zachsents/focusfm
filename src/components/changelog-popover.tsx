@@ -59,7 +59,7 @@ export function ChangelogPopover() {
                     className="mt-0.5 block text-[0.62rem] text-[var(--ink-soft)]"
                     dateTime={entry.date}
                   >
-                    {entry.date}
+                    {entry.date} · {entry.author}
                   </time>
                 </div>
               </li>
