@@ -1,4 +1,4 @@
-import { useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 
 import type { TrackId } from "#/data/tracks"
 import { AudioEngine } from "#/lib/audio-engine"
@@ -54,29 +54,59 @@ export function useFocusMixer() {
     ? !matchesPreset(snapshot, activePreset)
     : false
 
-  const togglePlayback = async () => {
+  const setPlaybackState = useCallback((playing: boolean) => {
+    setIsPlaying(playing)
+    if ("mediaSession" in navigator) {
+      navigator.mediaSession.playbackState = playing ? "playing" : "paused"
+    }
+  }, [])
+
+  const play = useCallback(async () => {
     const engine = (engineRef.current ??= new AudioEngine())
     setAudioError(undefined)
 
     try {
-      if (isPlaying) {
-        await engine.pause()
-        setIsPlaying(false)
-        return
-      }
-
       await engine.play(
         snapshot.channels,
         snapshot.masterVolume,
         snapshot.bpm,
         snapshot.neuralModulation,
       )
-      setIsPlaying(true)
+      setPlaybackState(true)
     } catch {
       setAudioError(
         "Audio could not start. Check this browser’s sound permissions and try again.",
       )
     }
+  }, [setPlaybackState, snapshot])
+
+  const pause = useCallback(async () => {
+    await engineRef.current?.pause()
+    setPlaybackState(false)
+  }, [setPlaybackState])
+
+  useEffect(() => {
+    if (!("mediaSession" in navigator)) return
+
+    const mediaSession = navigator.mediaSession
+    mediaSession.metadata = new MediaMetadata({
+      title: "Focus mix",
+      artist: "Focus FM",
+      album: "Focus FM",
+    })
+    mediaSession.setActionHandler("play", () => void play())
+    mediaSession.setActionHandler("pause", () => void pause())
+
+    return () => {
+      mediaSession.setActionHandler("play", null)
+      mediaSession.setActionHandler("pause", null)
+      mediaSession.playbackState = "none"
+    }
+  }, [pause, play])
+
+  const togglePlayback = async () => {
+    if (isPlaying) await pause()
+    else await play()
   }
 
   const preparePreview = async () => {
