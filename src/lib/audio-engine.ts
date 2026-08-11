@@ -485,9 +485,9 @@ async function loadRecordedBuffer(
 
 /** Renders a procedural loop for generated tracks and offline fallbacks. */
 function renderTrackBuffer(context: AudioContext, trackId: TrackId) {
-  const binauralBeatFrequency = BINAURAL_BEAT_FREQUENCIES[trackId]
-  if (binauralBeatFrequency) {
-    return renderBinauralBuffer(context, binauralBeatFrequency)
+  const binauralTone = BINAURAL_TONES[trackId]
+  if (binauralTone) {
+    return renderBinauralBuffer(context, binauralTone)
   }
 
   const nativeBpm = TRACKS_BY_ID.get(trackId)?.nativeBpm
@@ -735,15 +735,21 @@ function renderDroneSample(time: number) {
   )
 }
 
-const BINAURAL_BEAT_FREQUENCIES: Partial<Record<TrackId, number>> = {
-  "binaural-tone": 6,
-  "binaural-calm": 10,
-  "binaural-focus": 14,
-  "binaural-deep-focus": 18,
+interface BinauralTone {
+  carrierFrequency: number
+  beatFrequency: number
+}
+
+const BINAURAL_TONES: Partial<Record<TrackId, BinauralTone>> = {
+  "binaural-tone": { carrierFrequency: 250, beatFrequency: 6 },
+  "binaural-calm": { carrierFrequency: 320, beatFrequency: 10 },
+  "binaural-focus": { carrierFrequency: 400, beatFrequency: 16 },
+  // Retained so a mix saved during the beta rollout remains playable.
+  "binaural-deep-focus": { carrierFrequency: 400, beatFrequency: 18 },
 }
 
 /** Renders a true stereo binaural difference at the requested beat rate. */
-function renderBinauralBuffer(context: AudioContext, beatFrequency: number) {
+function renderBinauralBuffer(context: AudioContext, tone: BinauralTone) {
   const duration = 16
   const sampleRate = context.sampleRate
   const buffer = context.createBuffer(2, duration * sampleRate, sampleRate)
@@ -753,9 +759,14 @@ function renderBinauralBuffer(context: AudioContext, beatFrequency: number) {
   left.forEach((_, index) => {
     const time = index / sampleRate
     const breath = 0.84 + 0.12 * Math.sin((Math.PI * 2 * time) / duration)
-    left[index] = Math.sin(Math.PI * 2 * 160 * time) * breath * 0.2
+    left[index] =
+      Math.sin(Math.PI * 2 * tone.carrierFrequency * time) * breath * 0.2
     right[index] =
-      Math.sin(Math.PI * 2 * (160 + beatFrequency) * time) * breath * 0.2
+      Math.sin(
+        Math.PI * 2 * (tone.carrierFrequency + tone.beatFrequency) * time,
+      ) *
+      breath *
+      0.2
   })
 
   return buffer

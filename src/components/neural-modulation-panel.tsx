@@ -11,10 +11,12 @@ import {
   PopoverTrigger,
 } from "#/components/ui/popover"
 import { ToggleGroup, ToggleGroupItem } from "#/components/ui/toggle-group"
-import type {
-  NeuralModulationIntensity,
-  NeuralModulationMode,
-  NeuralModulationSettings,
+import {
+  NEURAL_MODULATION_DEPTHS,
+  NEURAL_MODULATION_FREQUENCIES,
+  type NeuralModulationIntensity,
+  type NeuralModulationMode,
+  type NeuralModulationSettings,
 } from "#/lib/neural-modulation"
 
 interface NeuralModulationPanelProps {
@@ -28,18 +30,19 @@ const MODES: ReadonlyArray<{
   detail: string
 }> = [
   { id: "off", name: "Off", detail: "No modulation" },
-  { id: "gentle", name: "Gentle", detail: "10 Hz" },
+  { id: "gentle", name: "Gentle", detail: "8 Hz" },
   { id: "focus", name: "Focus", detail: "14 Hz" },
-  { id: "deep", name: "Deep", detail: "18 Hz" },
+  { id: "deep", name: "Deep", detail: "20 Hz" },
 ]
 
 const INTENSITIES: ReadonlyArray<{
   id: NeuralModulationIntensity
   name: string
+  detail: string
 }> = [
-  { id: "soft", name: "Soft" },
-  { id: "balanced", name: "Balanced" },
-  { id: "strong", name: "Strong" },
+  { id: "soft", name: "Soft", detail: "18%" },
+  { id: "balanced", name: "Balanced", detail: "36%" },
+  { id: "strong", name: "Strong", detail: "60%" },
 ]
 
 /** Controls experimental amplitude modulation across the complete mix. */
@@ -48,6 +51,10 @@ export function NeuralModulationPanel({
   onChange,
 }: NeuralModulationPanelProps) {
   const activeMode = MODES.find((mode) => mode.id === settings.mode)
+  const activeFrequency = NEURAL_MODULATION_FREQUENCIES[settings.mode]
+  const activeDepth = Math.round(
+    NEURAL_MODULATION_DEPTHS[settings.intensity] * 100,
+  )
 
   return (
     <Popover>
@@ -82,7 +89,7 @@ export function NeuralModulationPanel({
             <Badge variant="outline">Beta</Badge>
           </div>
           <PopoverDescription>
-            Adds a subtle rhythmic pulse across your full mix. Experimental—not
+            Adds a fast rhythmic texture across your full mix. Experimental—not
             a medical treatment.
           </PopoverDescription>
         </PopoverHeader>
@@ -137,15 +144,19 @@ export function NeuralModulationPanel({
                 key={intensity.id}
                 value={intensity.id}
               >
-                {intensity.name}
+                <span className="font-bold">{intensity.name}</span>
+                <span className="text-[0.58rem] opacity-65">
+                  {intensity.detail}
+                </span>
               </ToggleGroupItem>
             ))}
           </ToggleGroup>
         </fieldset>
 
         <p className="text-[0.65rem] leading-relaxed text-[var(--ink-soft)]">
-          Start with Balanced. Lower the intensity if the pulse competes with
-          your work or other sounds.
+          {settings.mode === "off"
+            ? "Choose a mode, then start with Balanced."
+            : `${activeMode?.name} applies ${activeFrequency} Hz modulation at ${activeDepth}% depth. Lower it if the texture competes with your work.`}
         </p>
       </PopoverContent>
     </Popover>

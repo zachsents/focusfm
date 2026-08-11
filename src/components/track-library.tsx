@@ -40,7 +40,9 @@ export function TrackLibrary({
   const [filter, setFilter] = useState<"all" | TrackCategory>("all")
   const [isOpen, setIsOpen] = useState(false)
   const visibleTracks = TRACK_LIBRARY.filter(
-    (track) => filter === "all" || track.category === filter,
+    (track) =>
+      track.available !== false &&
+      (filter === "all" || track.category === filter),
   )
 
   return (

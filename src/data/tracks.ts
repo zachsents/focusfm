@@ -56,6 +56,7 @@ export interface TrackDefinition {
   category: TrackCategory
   source: "generated" | "recorded"
   nativeBpm?: number
+  available?: boolean
 }
 
 export const TRACK_LIBRARY: readonly TrackDefinition[] = [
@@ -340,30 +341,31 @@ export const TRACK_LIBRARY: readonly TrackDefinition[] = [
   {
     id: "binaural-tone",
     name: "Binaural · Relax",
-    description: "6 Hz · slow and spacious",
+    description: "6 Hz beat · low 250 Hz carrier",
     category: "tone",
     source: "generated",
   },
   {
     id: "binaural-calm",
     name: "Binaural · Calm",
-    description: "10 Hz · steady and gentle",
+    description: "10 Hz beat · warm 320 Hz carrier",
     category: "tone",
     source: "generated",
   },
   {
     id: "binaural-focus",
     name: "Binaural · Focus",
-    description: "14 Hz · clear and attentive",
+    description: "16 Hz beat · clear 400 Hz carrier",
     category: "tone",
     source: "generated",
   },
   {
     id: "binaural-deep-focus",
     name: "Binaural · Deep focus",
-    description: "18 Hz · bright and active",
+    description: "Legacy 18 Hz binaural layer",
     category: "tone",
     source: "generated",
+    available: false,
   },
   {
     id: "soft-drone",
