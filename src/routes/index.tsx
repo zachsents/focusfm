@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router"
 import { ChannelStrip } from "#/components/channel-strip"
 import { MasterDock } from "#/components/master-dock"
 import { PresetControls } from "#/components/preset-controls"
+import { ShareMixButton } from "#/components/share-mix-button"
 import { TrackLibrary } from "#/components/track-library"
 import type { TrackId } from "#/data/tracks"
 import { useFocusMixer } from "#/hooks/use-focus-mixer"
@@ -53,6 +54,7 @@ function Home() {
             onSaveChanges={mixer.savePresetChanges}
             onDiscardChanges={mixer.discardPresetChanges}
           />
+          <ShareMixButton snapshot={mixer} />
           <TrackLibrary
             activeTrackIds={activeTrackIds}
             onPreviewPrepare={() => void mixer.preparePreview()}

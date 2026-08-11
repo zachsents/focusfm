@@ -2,6 +2,7 @@ import { useSyncExternalStore } from "react"
 import { z } from "zod"
 
 import { TRACK_IDS } from "#/data/tracks"
+import { getSharedMixFromLocation } from "#/lib/share-mix"
 import { DEFAULT_BPM, MAX_BPM, MIN_BPM } from "#/lib/transport"
 
 const channelSchema = z.object({
@@ -120,19 +121,37 @@ function getClientSnapshot(): MixerSnapshot {
   if (clientSnapshot) return clientSnapshot
   if (typeof window === "undefined") return DEFAULT_SNAPSHOT
 
+  const sharedMix = getSharedMixFromLocation(window.location)
+  const localSnapshot = getStoredSnapshot()
+  clientSnapshot = sharedMix
+    ? {
+        ...localSnapshot,
+        channels: sharedMix.channels.map((channel, index) => ({
+          ...channel,
+          id: `shared-${channel.trackId}-${index}`,
+        })),
+        masterVolume: sharedMix.masterVolume,
+        bpm: sharedMix.bpm,
+        activePresetId: null,
+      }
+    : localSnapshot
+  return clientSnapshot
+}
+
+/**
+ * Reads and validates a saved mixer snapshot, falling back when storage is
+ * invalid.
+ */
+function getStoredSnapshot() {
   const storedValue = window.localStorage.getItem(STORAGE_KEY)
-  if (!storedValue) {
-    clientSnapshot = DEFAULT_SNAPSHOT
-    return clientSnapshot
-  }
+  if (!storedValue) return DEFAULT_SNAPSHOT
 
   try {
     const parsedValue = mixerSnapshotSchema.safeParse(JSON.parse(storedValue))
-    clientSnapshot = parsedValue.success ? parsedValue.data : DEFAULT_SNAPSHOT
+    return parsedValue.success ? parsedValue.data : DEFAULT_SNAPSHOT
   } catch {
-    clientSnapshot = DEFAULT_SNAPSHOT
+    return DEFAULT_SNAPSHOT
   }
-  return clientSnapshot
 }
 
 /** Supplies a deterministic snapshot during server rendering. */
