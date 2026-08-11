@@ -11,6 +11,7 @@ import {
   type MixerSnapshot,
 } from "#/lib/mixer-store"
 import type { SharedMix } from "#/lib/share-mix"
+import type { NeuralModulationSettings } from "#/lib/neural-modulation"
 import { clampBpm } from "#/lib/transport"
 
 /** Writes a complete mixer state to the local external store. */
@@ -64,7 +65,12 @@ export function useFocusMixer() {
         return
       }
 
-      await engine.play(snapshot.channels, snapshot.masterVolume, snapshot.bpm)
+      await engine.play(
+        snapshot.channels,
+        snapshot.masterVolume,
+        snapshot.bpm,
+        snapshot.neuralModulation,
+      )
       setIsPlaying(true)
     } catch {
       setAudioError(
@@ -163,6 +169,11 @@ export function useFocusMixer() {
     const nextBpm = clampBpm(bpm)
     updateSnapshot({ ...snapshot, bpm: nextBpm })
     if (isPlaying) engineRef.current?.setBpm(nextBpm)
+  }
+
+  const setNeuralModulation = (neuralModulation: NeuralModulationSettings) => {
+    updateSnapshot({ ...snapshot, neuralModulation })
+    if (isPlaying) engineRef.current?.setNeuralModulation(neuralModulation)
   }
 
   const tapTempo = () => {
@@ -282,6 +293,7 @@ export function useFocusMixer() {
     removeChannel,
     setMasterVolume,
     setBpm,
+    setNeuralModulation,
     tapTempo,
     savePreset,
     loadPreset: applyPreset,

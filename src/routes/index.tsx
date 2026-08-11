@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router"
 import { ChannelStrip } from "#/components/channel-strip"
 import { ConfirmSharedMixDialog } from "#/components/confirm-shared-mix-dialog"
 import { MasterDock } from "#/components/master-dock"
+import { NeuralModulationPanel } from "#/components/neural-modulation-panel"
 import { PresetControls } from "#/components/preset-controls"
 import { ShareMixButton } from "#/components/share-mix-button"
 import { TrackLibrary } from "#/components/track-library"
@@ -51,6 +52,10 @@ function Home() {
           className="flex items-center justify-end gap-[0.55rem]"
           aria-label="Mixer actions"
         >
+          <NeuralModulationPanel
+            settings={mixer.neuralModulation}
+            onChange={mixer.setNeuralModulation}
+          />
           <PresetControls
             presets={mixer.presets}
             activePreset={mixer.activePreset}

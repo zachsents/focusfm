@@ -2,6 +2,11 @@ import soundTouchProcessorUrl from "@soundtouchjs/audio-worklet/processor?url"
 
 import { TRACKS_BY_ID, type TrackId } from "#/data/tracks"
 import type { MixerChannel } from "#/lib/mixer-store"
+import {
+  NEURAL_MODULATION_DEPTHS,
+  NEURAL_MODULATION_FREQUENCIES,
+  type NeuralModulationSettings,
+} from "#/lib/neural-modulation"
 import { BEATS_PER_BAR, clampBpm, DEFAULT_BPM } from "#/lib/transport"
 
 type SoundTouchNode = import("@soundtouchjs/audio-worklet").SoundTouchNode
@@ -66,6 +71,9 @@ const TRACK_LEVELS: Record<TrackId, number> = {
   "kaoss-loop": 0.5,
   "funk-percussion-loop": 0.48,
   "binaural-tone": 0.2,
+  "binaural-calm": 0.2,
+  "binaural-focus": 0.2,
+  "binaural-deep-focus": 0.2,
   "soft-drone": 0.24,
   "warm-synth": 0.34,
   "distant-keys": 0.42,
@@ -107,6 +115,10 @@ const PREVIEW_VOLUME = 0.7
 export class AudioEngine {
   private context: AudioContext | undefined
   private masterGain: GainNode | undefined
+  private mixBus: GainNode | undefined
+  private modulationGain: GainNode | undefined
+  private modulationDepth: GainNode | undefined
+  private modulationOscillator: OscillatorNode | undefined
   private channels = new Map<string, ManagedChannel>()
   private pendingChannels = new Map<
     string,
@@ -124,23 +136,38 @@ export class AudioEngine {
 
   /** Creates the audio graph on the first user gesture. */
   private ensureContext() {
-    if (this.context && this.masterGain) {
-      return { context: this.context, masterGain: this.masterGain }
+    if (this.context && this.masterGain && this.mixBus) {
+      return {
+        context: this.context,
+        masterGain: this.masterGain,
+        mixBus: this.mixBus,
+      }
     }
 
     const context = new AudioContext({ latencyHint: "playback" })
-    const compressor = context.createDynamicsCompressor()
-    compressor.threshold.value = -18
-    compressor.knee.value = 18
-    compressor.ratio.value = 4
-    compressor.attack.value = 0.08
-    compressor.release.value = 0.35
-
     const masterGain = context.createGain()
-    compressor.connect(masterGain).connect(context.destination)
+    const mixBus = context.createGain()
+    const modulationGain = context.createGain()
+    modulationGain.gain.value = 1
+    const modulationDepth = context.createGain()
+    modulationDepth.gain.value = 0
+    const modulationOscillator = context.createOscillator()
+    modulationOscillator.type = "sine"
+    modulationOscillator.frequency.value = 10
+    modulationOscillator.connect(modulationDepth).connect(modulationGain.gain)
+    modulationOscillator.start()
+
+    mixBus
+      .connect(modulationGain)
+      .connect(masterGain)
+      .connect(context.destination)
     this.context = context
     this.masterGain = masterGain
-    return { context, masterGain }
+    this.mixBus = mixBus
+    this.modulationGain = modulationGain
+    this.modulationDepth = modulationDepth
+    this.modulationOscillator = modulationOscillator
+    return { context, masterGain, mixBus }
   }
 
   /** Creates a separate output graph so previews never disturb mixer nodes. */
@@ -162,6 +189,7 @@ export class AudioEngine {
     channels: readonly MixerChannel[],
     masterVolume: number,
     bpm: number,
+    neuralModulation: NeuralModulationSettings,
   ) {
     const { context } = this.ensureContext()
     this.setBpm(bpm)
@@ -170,6 +198,7 @@ export class AudioEngine {
       this.transportAnchorBeat = 0
     }
     this.setMasterVolume(masterVolume)
+    this.setNeuralModulation(neuralModulation)
     await this.syncChannels(channels)
     await context.resume()
   }
@@ -236,11 +265,11 @@ export class AudioEngine {
 
   /** Applies one channel state to its Web Audio nodes. */
   async updateChannel(channel: MixerChannel) {
-    const { context, masterGain } = this.ensureContext()
+    const { context, mixBus } = this.ensureContext()
     this.activeChannelIds.add(channel.id)
     const managedChannel = await this.getOrCreateChannel(
       context,
-      masterGain,
+      mixBus,
       channel,
     )
     if (!managedChannel) return
@@ -257,6 +286,23 @@ export class AudioEngine {
   setMasterVolume(volume: number) {
     const { context, masterGain } = this.ensureContext()
     masterGain.gain.setTargetAtTime(volume, context.currentTime, 0.03)
+  }
+
+  /** Applies subtle sine-wave amplitude modulation to the complete output. */
+  setNeuralModulation(settings: NeuralModulationSettings) {
+    const { context } = this.ensureContext()
+    const frequency = NEURAL_MODULATION_FREQUENCIES[settings.mode]
+    const depth =
+      settings.mode === "off" ? 0 : NEURAL_MODULATION_DEPTHS[settings.intensity]
+    const now = context.currentTime
+
+    this.modulationOscillator?.frequency.setTargetAtTime(
+      frequency || 10,
+      now,
+      0.04,
+    )
+    this.modulationGain?.gain.setTargetAtTime(1 - depth / 2, now, 0.04)
+    this.modulationDepth?.gain.setTargetAtTime(depth / 2, now, 0.04)
   }
 
   /** Changes every rhythmic channel's tempo while preserving pitch and phase. */
@@ -299,7 +345,7 @@ export class AudioEngine {
   /** Reuses an in-flight channel build when controls change during loading. */
   private async getOrCreateChannel(
     context: AudioContext,
-    masterGain: GainNode,
+    mixBus: GainNode,
     channel: MixerChannel,
   ) {
     const existingChannel = this.channels.get(channel.id)
@@ -307,7 +353,7 @@ export class AudioEngine {
 
     const pendingChannel =
       this.pendingChannels.get(channel.id) ??
-      this.createChannel(context, masterGain, channel)
+      this.createChannel(context, mixBus, channel)
     this.pendingChannels.set(channel.id, pendingChannel)
 
     try {
@@ -320,7 +366,7 @@ export class AudioEngine {
   /** Builds a complete source-to-master signal chain. */
   private async createChannel(
     context: AudioContext,
-    masterGain: GainNode,
+    mixBus: GainNode,
     channel: MixerChannel,
   ) {
     const nativeBpm = TRACKS_BY_ID.get(channel.trackId)?.nativeBpm
@@ -357,7 +403,7 @@ export class AudioEngine {
       source.connect(lowShelf)
     }
     lowShelf.connect(highShelf).connect(panner).connect(gain)
-    gain.connect(masterGain)
+    gain.connect(mixBus)
     source.start(
       nativeBpm ? this.getNextBarTime(context) : 0,
       nativeBpm ? 0 : Math.random() * source.buffer.duration,
@@ -439,7 +485,10 @@ async function loadRecordedBuffer(
 
 /** Renders a procedural loop for generated tracks and offline fallbacks. */
 function renderTrackBuffer(context: AudioContext, trackId: TrackId) {
-  if (trackId === "binaural-tone") return renderBinauralBuffer(context)
+  const binauralBeatFrequency = BINAURAL_BEAT_FREQUENCIES[trackId]
+  if (binauralBeatFrequency) {
+    return renderBinauralBuffer(context, binauralBeatFrequency)
+  }
 
   const nativeBpm = TRACKS_BY_ID.get(trackId)?.nativeBpm
   const duration = nativeBpm ? (60 / nativeBpm) * 16 : 16
@@ -580,6 +629,9 @@ function getTrackSample(
         TRACKS_BY_ID.get(trackId)?.nativeBpm ?? DEFAULT_BPM,
       )
     case "binaural-tone":
+    case "binaural-calm":
+    case "binaural-focus":
+    case "binaural-deep-focus":
       return 0
     case "soft-drone":
       return renderDroneSample(time)
@@ -683,8 +735,15 @@ function renderDroneSample(time: number) {
   )
 }
 
-/** Renders a true stereo six-hertz binaural difference. */
-function renderBinauralBuffer(context: AudioContext) {
+const BINAURAL_BEAT_FREQUENCIES: Partial<Record<TrackId, number>> = {
+  "binaural-tone": 6,
+  "binaural-calm": 10,
+  "binaural-focus": 14,
+  "binaural-deep-focus": 18,
+}
+
+/** Renders a true stereo binaural difference at the requested beat rate. */
+function renderBinauralBuffer(context: AudioContext, beatFrequency: number) {
   const duration = 16
   const sampleRate = context.sampleRate
   const buffer = context.createBuffer(2, duration * sampleRate, sampleRate)
@@ -695,7 +754,8 @@ function renderBinauralBuffer(context: AudioContext) {
     const time = index / sampleRate
     const breath = 0.84 + 0.12 * Math.sin((Math.PI * 2 * time) / duration)
     left[index] = Math.sin(Math.PI * 2 * 160 * time) * breath * 0.2
-    right[index] = Math.sin(Math.PI * 2 * 166 * time) * breath * 0.2
+    right[index] =
+      Math.sin(Math.PI * 2 * (160 + beatFrequency) * time) * breath * 0.2
   })
 
   return buffer

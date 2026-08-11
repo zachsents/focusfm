@@ -2,6 +2,11 @@ import { useSyncExternalStore } from "react"
 import { z } from "zod"
 
 import { TRACK_IDS } from "#/data/tracks"
+import {
+  DEFAULT_NEURAL_MODULATION,
+  NEURAL_MODULATION_INTENSITIES,
+  NEURAL_MODULATION_MODES,
+} from "#/lib/neural-modulation"
 import { getSharedMixFromLocation, type SharedMix } from "#/lib/share-mix"
 import { DEFAULT_BPM, MAX_BPM, MIN_BPM } from "#/lib/transport"
 
@@ -23,11 +28,17 @@ const presetSchema = z.object({
   bpm: z.number().min(MIN_BPM).max(MAX_BPM).default(DEFAULT_BPM),
 })
 
+const neuralModulationSchema = z.object({
+  mode: z.enum(NEURAL_MODULATION_MODES),
+  intensity: z.enum(NEURAL_MODULATION_INTENSITIES),
+})
+
 const mixerSnapshotSchema = z.object({
   version: z.literal(1),
   channels: z.array(channelSchema),
   masterVolume: z.number().min(0).max(1),
   bpm: z.number().min(MIN_BPM).max(MAX_BPM).default(DEFAULT_BPM),
+  neuralModulation: neuralModulationSchema.default(DEFAULT_NEURAL_MODULATION),
   presets: z.array(presetSchema),
   activePresetId: z.string().nullable().default(null),
 })
@@ -42,6 +53,7 @@ const DEFAULT_SNAPSHOT: MixerSnapshot = {
   version: 1,
   masterVolume: 0.72,
   bpm: DEFAULT_BPM,
+  neuralModulation: DEFAULT_NEURAL_MODULATION,
   activePresetId: null,
   channels: [
     {
@@ -108,6 +120,7 @@ const SERVER_SNAPSHOT: MixerSnapshot = {
   version: 1,
   masterVolume: DEFAULT_SNAPSHOT.masterVolume,
   bpm: DEFAULT_SNAPSHOT.bpm,
+  neuralModulation: DEFAULT_NEURAL_MODULATION,
   activePresetId: null,
   channels: [],
   presets: [],
