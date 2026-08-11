@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router"
 
 import { ChannelStrip } from "#/components/channel-strip"
+import { ChangelogPopover } from "#/components/changelog-popover"
 import { ConfirmSharedMixDialog } from "#/components/confirm-shared-mix-dialog"
 import { MasterDock } from "#/components/master-dock"
 import { NeuralModulationPanel } from "#/components/neural-modulation-panel"
@@ -81,6 +82,7 @@ function Home() {
               else mixer.addTrack(trackId)
             }}
           />
+          <ChangelogPopover />
         </nav>
       </header>
 
