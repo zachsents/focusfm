@@ -1,6 +1,12 @@
 import soundTouchProcessorUrl from "@soundtouchjs/audio-worklet/processor?url"
 
 import { TRACKS_BY_ID, type TrackId } from "#/data/tracks"
+import {
+  BINAURAL_TONES,
+  isBinauralTrack,
+  renderBinauralSamples,
+  type BinauralTone,
+} from "#/lib/binaural"
 import type { MixerChannel } from "#/lib/mixer-store"
 import {
   NEURAL_MODULATION_DEPTHS,
@@ -265,11 +271,14 @@ export class AudioEngine {
 
   /** Applies one channel state to its Web Audio nodes. */
   async updateChannel(channel: MixerChannel) {
-    const { context, mixBus } = this.ensureContext()
+    const { context, masterGain, mixBus } = this.ensureContext()
     this.activeChannelIds.add(channel.id)
+    const outputBus = isNeuralModulationEligible(channel.trackId)
+      ? mixBus
+      : masterGain
     const managedChannel = await this.getOrCreateChannel(
       context,
-      mixBus,
+      outputBus,
       channel,
     )
     if (!managedChannel) return
@@ -277,7 +286,11 @@ export class AudioEngine {
     const now = context.currentTime
     const gain = channel.muted ? 0 : channel.volume
     managedChannel.gain.gain.setTargetAtTime(gain, now, 0.025)
-    managedChannel.panner.pan.setTargetAtTime(channel.pan, now, 0.03)
+    managedChannel.panner.pan.setTargetAtTime(
+      isBinauralTrack(channel.trackId) ? 0 : channel.pan,
+      now,
+      0.03,
+    )
     managedChannel.lowShelf.gain.setTargetAtTime(-channel.tone * 9, now, 0.04)
     managedChannel.highShelf.gain.setTargetAtTime(channel.tone * 9, now, 0.04)
   }
@@ -288,7 +301,7 @@ export class AudioEngine {
     masterGain.gain.setTargetAtTime(volume, context.currentTime, 0.03)
   }
 
-  /** Applies subtle sine-wave amplitude modulation to the complete output. */
+  /** Applies subtle sine-wave amplitude modulation to the musical output bus. */
   setNeuralModulation(settings: NeuralModulationSettings) {
     const { context } = this.ensureContext()
     const frequency = NEURAL_MODULATION_FREQUENCIES[settings.mode]
@@ -345,7 +358,7 @@ export class AudioEngine {
   /** Reuses an in-flight channel build when controls change during loading. */
   private async getOrCreateChannel(
     context: AudioContext,
-    mixBus: GainNode,
+    outputBus: GainNode,
     channel: MixerChannel,
   ) {
     const existingChannel = this.channels.get(channel.id)
@@ -353,7 +366,7 @@ export class AudioEngine {
 
     const pendingChannel =
       this.pendingChannels.get(channel.id) ??
-      this.createChannel(context, mixBus, channel)
+      this.createChannel(context, outputBus, channel)
     this.pendingChannels.set(channel.id, pendingChannel)
 
     try {
@@ -366,7 +379,7 @@ export class AudioEngine {
   /** Builds a complete source-to-master signal chain. */
   private async createChannel(
     context: AudioContext,
-    mixBus: GainNode,
+    outputBus: GainNode,
     channel: MixerChannel,
   ) {
     const nativeBpm = TRACKS_BY_ID.get(channel.trackId)?.nativeBpm
@@ -403,7 +416,7 @@ export class AudioEngine {
       source.connect(lowShelf)
     }
     lowShelf.connect(highShelf).connect(panner).connect(gain)
-    gain.connect(mixBus)
+    gain.connect(outputBus)
     source.start(
       nativeBpm ? this.getNextBarTime(context) : 0,
       nativeBpm ? 0 : Math.random() * source.buffer.duration,
@@ -452,6 +465,17 @@ export class AudioEngine {
       (Math.floor(currentBeat / BEATS_PER_BAR) + 1) * BEATS_PER_BAR
     return now + ((nextBarBeat - currentBeat) * 60) / this.bpm
   }
+}
+
+/**
+ * Limits modulation to musical layers without altering ambience or binaural
+ * cues.
+ */
+function isNeuralModulationEligible(trackId: TrackId) {
+  const category = TRACKS_BY_ID.get(trackId)?.category
+  return (
+    category === "rhythm" || (category === "tone" && !isBinauralTrack(trackId))
+  )
 }
 
 /** Returns a lazily loaded or rendered loop buffer for a library track. */
@@ -735,19 +759,6 @@ function renderDroneSample(time: number) {
   )
 }
 
-interface BinauralTone {
-  carrierFrequency: number
-  beatFrequency: number
-}
-
-const BINAURAL_TONES: Partial<Record<TrackId, BinauralTone>> = {
-  "binaural-tone": { carrierFrequency: 250, beatFrequency: 6 },
-  "binaural-calm": { carrierFrequency: 320, beatFrequency: 10 },
-  "binaural-focus": { carrierFrequency: 400, beatFrequency: 16 },
-  // Retained so a mix saved during the beta rollout remains playable.
-  "binaural-deep-focus": { carrierFrequency: 400, beatFrequency: 18 },
-}
-
 /** Renders a true stereo binaural difference at the requested beat rate. */
 function renderBinauralBuffer(context: AudioContext, tone: BinauralTone) {
   const duration = 16
@@ -755,19 +766,7 @@ function renderBinauralBuffer(context: AudioContext, tone: BinauralTone) {
   const buffer = context.createBuffer(2, duration * sampleRate, sampleRate)
   const left = buffer.getChannelData(0)
   const right = buffer.getChannelData(1)
-
-  left.forEach((_, index) => {
-    const time = index / sampleRate
-    const breath = 0.84 + 0.12 * Math.sin((Math.PI * 2 * time) / duration)
-    left[index] =
-      Math.sin(Math.PI * 2 * tone.carrierFrequency * time) * breath * 0.2
-    right[index] =
-      Math.sin(
-        Math.PI * 2 * (tone.carrierFrequency + tone.beatFrequency) * time,
-      ) *
-      breath *
-      0.2
-  })
+  renderBinauralSamples(left, right, sampleRate, tone)
 
   return buffer
 }

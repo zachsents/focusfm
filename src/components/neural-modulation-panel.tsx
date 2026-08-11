@@ -31,8 +31,8 @@ const MODES: ReadonlyArray<{
 }> = [
   { id: "off", name: "Off", detail: "No modulation" },
   { id: "gentle", name: "Gentle", detail: "8 Hz" },
-  { id: "focus", name: "Focus", detail: "14 Hz" },
-  { id: "deep", name: "Deep", detail: "20 Hz" },
+  { id: "focus", name: "Focus", detail: "16 Hz" },
+  { id: "deep", name: "Fast", detail: "32 Hz" },
 ]
 
 const INTENSITIES: ReadonlyArray<{
@@ -40,9 +40,9 @@ const INTENSITIES: ReadonlyArray<{
   name: string
   detail: string
 }> = [
-  { id: "soft", name: "Soft", detail: "18%" },
-  { id: "balanced", name: "Balanced", detail: "36%" },
-  { id: "strong", name: "Strong", detail: "60%" },
+  { id: "soft", name: "Soft", detail: "6%" },
+  { id: "balanced", name: "Balanced", detail: "9%" },
+  { id: "strong", name: "Present", detail: "12%" },
 ]
 
 /** Controls experimental amplitude modulation across the complete mix. */
@@ -89,8 +89,8 @@ export function NeuralModulationPanel({
             <Badge variant="outline">Beta</Badge>
           </div>
           <PopoverDescription>
-            Adds a fast rhythmic texture across your full mix. Experimental—not
-            a medical treatment.
+            Adds fast amplitude modulation to musical layers. Experimental—not a
+            medical treatment.
           </PopoverDescription>
         </PopoverHeader>
 
@@ -156,7 +156,7 @@ export function NeuralModulationPanel({
         <p className="text-[0.65rem] leading-relaxed text-[var(--ink-soft)]">
           {settings.mode === "off"
             ? "Choose a mode, then start with Balanced."
-            : `${activeMode?.name} applies ${activeFrequency} Hz modulation at ${activeDepth}% depth. Lower it if the texture competes with your work.`}
+            : `${activeMode?.name} applies ${activeFrequency} Hz modulation at ${activeDepth}% depth to synth, drone, keys, and rhythm layers.`}
         </p>
       </PopoverContent>
     </Popover>

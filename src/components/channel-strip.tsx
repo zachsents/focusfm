@@ -5,6 +5,7 @@ import { Button } from "#/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card"
 import { Toggle } from "#/components/ui/toggle"
 import { TRACKS_BY_ID } from "#/data/tracks"
+import { isBinauralTrack } from "#/lib/binaural"
 import type { MixerChannel } from "#/lib/mixer-store"
 import { cn } from "#/lib/utils"
 
@@ -26,6 +27,7 @@ export function ChannelStrip({
 }: ChannelStripProps) {
   const track = TRACKS_BY_ID.get(channel.trackId)
   if (!track) return null
+  const isBinaural = isBinauralTrack(channel.trackId)
 
   return (
     <Card
@@ -81,22 +83,37 @@ export function ChannelStrip({
             }
             onChange={(tone) => onChange({ ...channel, tone })}
           />
-          <ElasticSlider
-            label="Balance"
-            value={channel.pan}
-            min={-1}
-            max={1}
-            step={0.01}
-            accent="var(--ink)"
-            startIcon={null}
-            endIcon={null}
-            valueLabel={
-              channel.pan === 0
-                ? "center"
-                : `${Math.abs(Math.round(channel.pan * 100))}${channel.pan < 0 ? "L" : "R"}`
-            }
-            onChange={(pan) => onChange({ ...channel, pan })}
-          />
+          {isBinaural ? (
+            <div
+              className="grid gap-[0.4rem]"
+              aria-label="Balance stereo locked. Headphones required."
+            >
+              <div className="flex justify-between text-[0.66rem] font-bold text-[var(--ink-soft)]">
+                <span>Balance</span>
+                <span className="text-[var(--ink)]">stereo locked</span>
+              </div>
+              <div className="grid min-h-[2.3rem] place-items-center rounded-full border border-[color-mix(in_oklch,var(--line-strong),transparent_22%)] bg-[var(--paper-deep)] px-3 text-[0.62rem] font-bold tracking-[0.04em] text-[var(--ink-soft)] uppercase shadow-[inset_0.12rem_0.12rem_0.28rem_oklch(30%_0.01_250_/_0.16)]">
+                Headphones required
+              </div>
+            </div>
+          ) : (
+            <ElasticSlider
+              label="Balance"
+              value={channel.pan}
+              min={-1}
+              max={1}
+              step={0.01}
+              accent="var(--ink)"
+              startIcon={null}
+              endIcon={null}
+              valueLabel={
+                channel.pan === 0
+                  ? "center"
+                  : `${Math.abs(Math.round(channel.pan * 100))}${channel.pan < 0 ? "L" : "R"}`
+              }
+              onChange={(pan) => onChange({ ...channel, pan })}
+            />
+          )}
         </div>
 
         <div className="flex items-stretch gap-[0.4rem] pt-[0.45rem] [@media(max-height:42rem)]:pt-1">

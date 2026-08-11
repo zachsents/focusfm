@@ -31,15 +31,15 @@ export const NEURAL_MODULATION_FREQUENCIES: Record<
 > = {
   off: 0,
   gentle: 8,
-  focus: 14,
-  deep: 20,
+  focus: 16,
+  deep: 32,
 }
 
 export const NEURAL_MODULATION_DEPTHS: Record<
   NeuralModulationIntensity,
   number
 > = {
-  soft: 0.18,
-  balanced: 0.36,
-  strong: 0.6,
+  soft: 0.06,
+  balanced: 0.09,
+  strong: 0.12,
 }
