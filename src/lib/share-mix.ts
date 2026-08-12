@@ -4,6 +4,7 @@ import { TRACK_IDS, type TrackId } from "#/data/tracks"
 import { MAX_BPM, MIN_BPM } from "#/lib/transport"
 
 const SHARE_PARAM = "mix"
+const COMPACT_SHARE_PREFIX = `${SHARE_PARAM}-`
 const MAX_SHARE_TOKEN_LENGTH = 12_000
 
 const sharedChannelSchema = z.object({
@@ -68,11 +69,21 @@ export function decodeSharedMix(value: string | null) {
 /** Builds a shareable URL that restores the current audible mixer configuration. */
 export function createShareUrl(mix: SharedMix, location: Location) {
   const url = new URL(location.href)
-  url.searchParams.set(SHARE_PARAM, encodeSharedMix(mix))
+  // Messages splits a long `?mix=<token>` URL at the equals sign, producing a
+  // preview followed by a second message containing the raw token. Keeping the
+  // whole payload in one URL-safe query segment prevents that split.
+  url.search = `${COMPACT_SHARE_PREFIX}${encodeSharedMix(mix)}`
   return url.toString()
 }
 
 /** Reads the current page's shared mix when one is present. */
 export function getSharedMixFromLocation(location: Location) {
-  return decodeSharedMix(new URLSearchParams(location.search).get(SHARE_PARAM))
+  const compactValue = location.search.startsWith(`?${COMPACT_SHARE_PREFIX}`)
+    ? location.search.slice(COMPACT_SHARE_PREFIX.length + 1)
+    : null
+
+  // Continue accepting links generated before the compact URL format shipped.
+  return decodeSharedMix(
+    compactValue ?? new URLSearchParams(location.search).get(SHARE_PARAM),
+  )
 }
