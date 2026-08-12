@@ -10,11 +10,17 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as MTokenRouteImport } from './routes/m.$token'
 import { Route as MixTokenRouteImport } from './routes/mix.$token'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MTokenRoute = MTokenRouteImport.update({
+  id: '/m/$token',
+  path: '/m/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MixTokenRoute = MixTokenRouteImport.update({
@@ -25,27 +31,31 @@ const MixTokenRoute = MixTokenRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/m/$token': typeof MTokenRoute
   '/mix/$token': typeof MixTokenRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/m/$token': typeof MTokenRoute
   '/mix/$token': typeof MixTokenRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/m/$token': typeof MTokenRoute
   '/mix/$token': typeof MixTokenRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/mix/$token'
+  fullPaths: '/' | '/m/$token' | '/mix/$token'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/mix/$token'
-  id: '__root__' | '/' | '/mix/$token'
+  to: '/' | '/m/$token' | '/mix/$token'
+  id: '__root__' | '/' | '/m/$token' | '/mix/$token'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  MTokenRoute: typeof MTokenRoute
   MixTokenRoute: typeof MixTokenRoute
 }
 
@@ -56,6 +66,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/m/$token': {
+      id: '/m/$token'
+      path: '/m/$token'
+      fullPath: '/m/$token'
+      preLoaderRoute: typeof MTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/mix/$token': {
@@ -70,6 +87,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  MTokenRoute: MTokenRoute,
   MixTokenRoute: MixTokenRoute,
 }
 export const routeTree = rootRouteImport
