@@ -864,16 +864,25 @@ function renderAcidTechnoKickSamples(
     const phaseCycles =
       47 * phase + (132 / pitchDecay) * (1 - Math.exp(-pitchDecay * phase))
     const body =
-      phase < 0.28
-        ? Math.sin(Math.PI * 2 * phaseCycles) * Math.exp(-phase * 17) * accent
+      phase < 0.32
+        ? Math.sin(Math.PI * 2 * phaseCycles) * Math.exp(-phase * 14.5) * accent
+        : 0
+    const sub =
+      phase < 0.36
+        ? Math.sin(Math.PI * 2 * 43 * phase) *
+          Math.exp(-phase * 10.5) *
+          0.38 *
+          accent
         : 0
     const knock =
       phase < 0.09
-        ? Math.sin(Math.PI * 2 * 126 * phase) * Math.exp(-phase * 38) * 0.42
+        ? Math.sin(Math.PI * 2 * 118 * phase) * Math.exp(-phase * 42) * 0.32
         : 0
     const click =
       phase < 0.009 ? (random() * 2 - 1) * Math.exp(-phase * 310) * 0.22 : 0
-    const dry = Math.tanh((body + knock + click) * 1.72)
+    // Parallel sub and firm saturation flatten the crest into a dense punch
+    // while keeping the final buffer safely bounded.
+    const dry = Math.tanh((body + sub + knock + click) * 2.15)
 
     const delayed = delay[delayIndex]
     const feedback = Math.tanh(delayed * 1.15) * 0.46
@@ -893,7 +902,7 @@ function renderAcidTechnoKickSamples(
     echoIndex = (echoIndex + 1) % echo.length
 
     const output =
-      Math.tanh((dry * 0.9 + rumble * 0.68 + echoLowPass * 0.24) * 0.94) * 0.84
+      Math.tanh((dry * 0.96 + rumble * 0.62 + echoLowPass * 0.22) * 0.98) * 0.84
 
     if (index >= samples.length) samples[loopIndex] = output
   }
