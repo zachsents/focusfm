@@ -121,6 +121,9 @@ const PREVIEW_VOLUME = 0.7
 const ACID_SYNTH_SEMITONES = [
   0, 0, 12, 3, 0, 7, 10, 3, 0, 12, 7, 15, 0, 10, 7, 3,
 ] as const
+const ACID_SYNTH_ACCENTS = new Set([0, 5, 8, 11, 13])
+const ACID_SYNTH_SLIDES = new Set([2, 7, 10, 14])
+const ACID_SYNTH_RESTS = new Set([6, 15])
 
 /** Runs the mixer's recorded and procedural Web Audio graph. */
 export class AudioEngine {
@@ -538,6 +541,15 @@ function renderTrack(
   sampleRate: number,
   trackId: TrackId,
 ) {
+  if (trackId === "acid-techno-kick") {
+    renderAcidTechnoKickSamples(samples, sampleRate)
+    return
+  }
+  if (trackId === "acid-synth") {
+    renderAcidSynthSamples(samples, sampleRate)
+    return
+  }
+
   const random = createRandom(hashString(trackId))
   const state: NoiseState = {
     brown: 0,
@@ -640,7 +652,7 @@ function getTrackSample(
     case "soft-drums":
       return renderDrumSample(time, white)
     case "acid-techno-kick":
-      return renderAcidTechnoKickSample(time, white)
+      return 0 // Rendered statefully before the generic per-sample path.
     case "brushed-shaker":
       return renderShakerSample(time, white)
     case "tape-pulse":
@@ -669,7 +681,7 @@ function getTrackSample(
     case "warm-synth":
       return renderSynthSample(time)
     case "acid-synth":
-      return renderAcidSynthSample(time)
+      return 0 // Rendered statefully before the generic per-sample path.
     case "distant-keys":
       return renderKeysSample(time)
   }
@@ -807,28 +819,57 @@ function renderDrumSample(time: number, white: number, bpm = 76) {
   return kick * 0.78 + snare + hat
 }
 
-/** Synthesizes a saturated four-on-the-floor kick with an acid-techno rumble. */
-function renderAcidTechnoKickSample(time: number, white: number) {
+/** Renders a hard 909-style kick through a ducked, distorted rumble network. */
+function renderAcidTechnoKickSamples(
+  samples: Float32Array,
+  sampleRate: number,
+) {
   const beatLength = 60 / 130
-  const phase = time % beatLength
-  if (phase >= 0.44) return 0
+  const delay = new Float32Array(Math.floor(sampleRate * 0.092))
+  const random = createRandom(hashString("acid-techno-kick"))
+  let delayIndex = 0
+  let rumbleLowPass = 0
+  let previousRumbleLowPass = 0
 
-  // Integrate an exponential pitch dive for a stable 909-like body.
-  const pitchDecay = 34
-  const phaseCycles =
-    48 * phase + (118 / pitchDecay) * (1 - Math.exp(-pitchDecay * phase))
-  const body = Math.sin(Math.PI * 2 * phaseCycles) * Math.exp(-phase * 15)
-  const knock =
-    Math.sin(Math.PI * 2 * 112 * phase) * Math.exp(-phase * 42) * 0.34
-  const click = phase < 0.012 ? white * Math.exp(-phase * 260) * 0.2 : 0
-  const rumble =
-    phase > 0.075
-      ? Math.sin(Math.PI * 2 * 47 * (phase - 0.075)) *
-        Math.exp(-(phase - 0.075) * 7.2) *
-        0.2
-      : 0
+  // The first pass settles the feedback path so the rendered loop joins
+  // seamlessly instead of restarting its reverb tail at every boundary.
+  for (let index = 0; index < samples.length * 2; index += 1) {
+    const loopIndex = index % samples.length
+    const time = loopIndex / sampleRate
+    const phase = time % beatLength
+    const beat = Math.floor(time / beatLength) % 4
+    const accent = beat === 0 ? 1 : 0.88
 
-  return Math.tanh((body + knock + click + rumble) * 1.75) * 0.86
+    const pitchDecay = 38
+    const phaseCycles =
+      47 * phase + (132 / pitchDecay) * (1 - Math.exp(-pitchDecay * phase))
+    const body =
+      phase < 0.28
+        ? Math.sin(Math.PI * 2 * phaseCycles) * Math.exp(-phase * 17) * accent
+        : 0
+    const knock =
+      phase < 0.09
+        ? Math.sin(Math.PI * 2 * 126 * phase) * Math.exp(-phase * 38) * 0.42
+        : 0
+    const click =
+      phase < 0.009 ? (random() * 2 - 1) * Math.exp(-phase * 310) * 0.22 : 0
+    const dry = Math.tanh((body + knock + click) * 2.7)
+
+    const delayed = delay[delayIndex]
+    const feedback = Math.tanh(delayed * 1.9) * 0.73
+    delay[delayIndex] = dry * 0.62 + feedback
+    delayIndex = (delayIndex + 1) % delay.length
+
+    // Two gentle one-pole stages darken the feedback into a warehouse-style
+    // low rumble while the sidechain curve leaves room for the next transient.
+    rumbleLowPass += (delayed - rumbleLowPass) * 0.035
+    previousRumbleLowPass += (rumbleLowPass - previousRumbleLowPass) * 0.022
+    const duck = Math.min(1, Math.max(0, (phase - 0.045) / 0.12))
+    const rumble = Math.tanh(previousRumbleLowPass * 4.2) * duck * 0.68
+    const output = Math.tanh((dry * 0.92 + rumble) * 1.18) * 0.82
+
+    if (index >= samples.length) samples[loopIndex] = output
+  }
 }
 
 /** Synthesizes a muted metronomic tape pulse. */
@@ -863,31 +904,63 @@ function renderSynthSample(time: number) {
   )
 }
 
-/** Synthesizes a warm 303-inspired bass phrase at a 130 BPM native tempo. */
-function renderAcidSynthSample(time: number) {
+/** Renders a driven, resonant 303-style sequence at a 130 BPM native tempo. */
+function renderAcidSynthSamples(samples: Float32Array, sampleRate: number) {
   const stepLength = 60 / 130 / 4
-  const step = Math.floor(time / stepLength) % 32
-  const phase = time % stepLength
-  if (step % 8 === 6) return 0
+  let oscillatorPhase = 0
+  let frequency = 55
+  let filterState1 = 0
+  let filterState2 = 0
 
-  const phraseStep = step % ACID_SYNTH_SEMITONES.length
-  const frequency = 55 * 2 ** (ACID_SYNTH_SEMITONES[phraseStep] / 12)
-  const accent = step % 8 === 0 || step % 8 === 5 ? 1 : 0.62
-  const envelope =
-    Math.min(1, phase / 0.004) * Math.exp(-phase * (8.5 - accent * 2.5))
-  const sweep = Math.exp(-phase * 24) * accent
+  samples.forEach((_, index) => {
+    const time = index / sampleRate
+    const absoluteStep = Math.floor(time / stepLength)
+    const step = absoluteStep % ACID_SYNTH_SEMITONES.length
+    const stepPhase = time % stepLength
+    const accent = ACID_SYNTH_ACCENTS.has(step)
+    const previousStep =
+      (step - 1 + ACID_SYNTH_SEMITONES.length) % ACID_SYNTH_SEMITONES.length
+    const targetFrequency = 55 * 2 ** (ACID_SYNTH_SEMITONES[step] / 12)
+    const shouldSlide = ACID_SYNTH_SLIDES.has(previousStep)
+    const glideTime = shouldSlide ? 0.055 : 0.002
+    frequency +=
+      (targetFrequency - frequency) *
+      (1 - Math.exp(-1 / (glideTime * sampleRate)))
+    oscillatorPhase = (oscillatorPhase + frequency / sampleRate) % 1
 
-  // A moving harmonic balance evokes a resonant low-pass sweep without
-  // requiring a separate filter node per sequencer step.
-  const fundamental = Math.sin(Math.PI * 2 * frequency * time)
-  const second =
-    Math.sin(Math.PI * 4 * frequency * time + sweep * 0.8) *
-    (0.28 + sweep * 0.26)
-  const third =
-    Math.sin(Math.PI * 6 * frequency * time + sweep * 1.3) *
-    (0.1 + sweep * 0.18)
+    const isRest = ACID_SYNTH_RESTS.has(step)
+    const attack = Math.min(1, stepPhase / 0.0025)
+    const ampEnvelope = isRest
+      ? 0
+      : attack * Math.exp(-stepPhase * (accent ? 3.8 : 5.8))
+    const filterEnvelope = Math.exp(-stepPhase * (accent ? 13 : 19))
+    const barMovement =
+      0.5 + 0.5 * Math.sin((Math.PI * 2 * absoluteStep) / 64 - Math.PI / 2)
+    const cutoff = Math.min(
+      sampleRate * 0.42,
+      240 + barMovement * 520 + filterEnvelope * (accent ? 5_800 : 3_100),
+    )
 
-  return Math.tanh((fundamental + second + third) * 1.35) * envelope * 0.62
+    const saw = oscillatorPhase * 2 - 1
+    const square = oscillatorPhase < 0.5 ? 1 : -1
+    const drivenOscillator = Math.tanh((saw * 0.88 + square * 0.12) * 1.7)
+
+    // A zero-delay state-variable low-pass gives the animated, high-resonance
+    // squelch; the nonlinear stages add the harder modern techno edge.
+    const g = Math.tan((Math.PI * cutoff) / sampleRate)
+    const resonance = accent ? 0.115 : 0.16
+    const a1 = 1 / (1 + g * (g + resonance))
+    const a2 = g * a1
+    const a3 = g * a2
+    const v3 = drivenOscillator - filterState2
+    const band = a1 * filterState1 + a2 * v3
+    const low = filterState2 + a2 * filterState1 + a3 * v3
+    filterState1 = 2 * band - filterState1
+    filterState2 = 2 * low - filterState2
+
+    const acid = low * 0.8 + band * (accent ? 0.32 : 0.2)
+    samples[index] = Math.tanh(acid * 3.4) * ampEnvelope * 0.7
+  })
 }
 
 /** Synthesizes widely spaced, bell-like keyboard notes. */
