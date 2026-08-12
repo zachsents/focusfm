@@ -19,12 +19,14 @@ export interface NeuralModulationSettings {
   mode: NeuralModulationMode
   intensity: NeuralModulationIntensity
   stereo: boolean
+  stereoDepth: number
 }
 
 export const DEFAULT_NEURAL_MODULATION: NeuralModulationSettings = {
   mode: "off",
   intensity: "balanced",
   stereo: false,
+  stereoDepth: 0.45,
 }
 
 export const NEURAL_MODULATION_FREQUENCIES: Record<
@@ -44,10 +46,4 @@ export const NEURAL_MODULATION_DEPTHS: Record<
   soft: 0.06,
   balanced: 0.09,
   strong: 0.12,
-}
-
-export const NEURAL_STEREO_DEPTHS: Record<NeuralModulationIntensity, number> = {
-  soft: 0.25,
-  balanced: 0.45,
-  strong: 0.7,
 }

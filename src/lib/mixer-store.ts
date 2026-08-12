@@ -32,6 +32,7 @@ const neuralModulationSchema = z.object({
   mode: z.enum(NEURAL_MODULATION_MODES),
   intensity: z.enum(NEURAL_MODULATION_INTENSITIES),
   stereo: z.boolean().default(false),
+  stereoDepth: z.number().min(0).max(1).default(0.45),
 })
 
 const mixerSnapshotSchema = z.object({

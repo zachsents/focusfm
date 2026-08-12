@@ -1,5 +1,6 @@
 import { IconWaveformLinesOutlineDuo18 } from "nucleo-ui-outline-duo-18"
 
+import { ElasticSlider } from "#/components/ElasticSlider"
 import { Badge } from "#/components/ui/badge"
 import { Button } from "#/components/ui/button"
 import { Toggle } from "#/components/ui/toggle"
@@ -178,6 +179,24 @@ export function NeuralModulationPanel({
               {settings.stereo ? "On" : "Off"}
             </span>
           </Toggle>
+          <div
+            className={
+              settings.stereo
+                ? "px-1 pt-1"
+                : "pointer-events-none px-1 pt-1 opacity-40"
+            }
+          >
+            <ElasticSlider
+              label="L/R intensity"
+              value={settings.stereoDepth}
+              min={0}
+              max={1}
+              step={0.01}
+              resetValue={0.45}
+              valueLabel={`${Math.round(settings.stereoDepth * 100)}%`}
+              onChange={(stereoDepth) => onChange({ ...settings, stereoDepth })}
+            />
+          </div>
         </fieldset>
 
         <p className="text-[0.65rem] leading-relaxed text-[var(--ink-soft)]">

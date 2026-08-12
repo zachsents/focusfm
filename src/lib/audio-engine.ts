@@ -11,7 +11,6 @@ import type { MixerChannel } from "#/lib/mixer-store"
 import {
   NEURAL_MODULATION_DEPTHS,
   NEURAL_MODULATION_FREQUENCIES,
-  NEURAL_STEREO_DEPTHS,
   type NeuralModulationSettings,
 } from "#/lib/neural-modulation"
 import { BEATS_PER_BAR, clampBpm, DEFAULT_BPM } from "#/lib/transport"
@@ -328,9 +327,7 @@ export class AudioEngine {
     const depth =
       settings.mode === "off" ? 0 : NEURAL_MODULATION_DEPTHS[settings.intensity]
     const stereoDepth =
-      settings.mode === "off" || !settings.stereo
-        ? 0
-        : NEURAL_STEREO_DEPTHS[settings.intensity]
+      settings.mode === "off" || !settings.stereo ? 0 : settings.stereoDepth
     const now = context.currentTime
 
     this.modulationOscillator?.frequency.setTargetAtTime(
