@@ -43,6 +43,7 @@ const SOUND_ICONS: Record<TrackId, ComponentType<IconProps>> = {
   "distant-thunder": IconRaindropsOutlineDuo18,
   "gull-calls": IconWaterWaveOutlineDuo18,
   "soft-drums": IconCircleMusicNoteOutlineDuo18,
+  "acid-techno-kick": IconCompactDiskOutlineDuo18,
   "brushed-shaker": IconCircleMusicNoteOutlineDuo18,
   "tape-pulse": IconCompactDiskOutlineDuo18,
   "slow-hop-loop": IconCircleMusicNoteOutlineDuo18,
@@ -60,6 +61,7 @@ const SOUND_ICONS: Record<TrackId, ComponentType<IconProps>> = {
   "binaural-deep-focus": IconSpeakerOutlineDuo18,
   "soft-drone": IconSpeakerOutlineDuo18,
   "warm-synth": IconSpeakerOutlineDuo18,
+  "acid-synth": IconCompactDiskOutlineDuo18,
   "distant-keys": IconKeyboardOutlineDuo18,
 }
 

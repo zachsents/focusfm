@@ -65,6 +65,7 @@ const TRACK_LEVELS: Record<TrackId, number> = {
   "distant-thunder": 0.4,
   "gull-calls": 0.26,
   "soft-drums": 0.55,
+  "acid-techno-kick": 0.62,
   "brushed-shaker": 0.34,
   "tape-pulse": 0.46,
   "slow-hop-loop": 0.58,
@@ -82,6 +83,7 @@ const TRACK_LEVELS: Record<TrackId, number> = {
   "binaural-deep-focus": 0.2,
   "soft-drone": 0.24,
   "warm-synth": 0.34,
+  "acid-synth": 0.3,
   "distant-keys": 0.42,
 }
 
@@ -116,6 +118,9 @@ const RECORDED_TRACK_URLS: Partial<Record<TrackId, string>> = {
 
 const bufferCache = new Map<TrackId, Promise<AudioBuffer>>()
 const PREVIEW_VOLUME = 0.7
+const ACID_SYNTH_SEMITONES = [
+  0, 0, 12, 3, 0, 7, 10, 3, 0, 12, 7, 15, 0, 10, 7, 3,
+] as const
 
 /** Runs the mixer's recorded and procedural Web Audio graph. */
 export class AudioEngine {
@@ -634,6 +639,8 @@ function getTrackSample(
       return renderGullFallback(time)
     case "soft-drums":
       return renderDrumSample(time, white)
+    case "acid-techno-kick":
+      return renderAcidTechnoKickSample(time, white)
     case "brushed-shaker":
       return renderShakerSample(time, white)
     case "tape-pulse":
@@ -661,6 +668,8 @@ function getTrackSample(
       return renderDroneSample(time)
     case "warm-synth":
       return renderSynthSample(time)
+    case "acid-synth":
+      return renderAcidSynthSample(time)
     case "distant-keys":
       return renderKeysSample(time)
   }
@@ -798,6 +807,30 @@ function renderDrumSample(time: number, white: number, bpm = 76) {
   return kick * 0.78 + snare + hat
 }
 
+/** Synthesizes a saturated four-on-the-floor kick with an acid-techno rumble. */
+function renderAcidTechnoKickSample(time: number, white: number) {
+  const beatLength = 60 / 130
+  const phase = time % beatLength
+  if (phase >= 0.44) return 0
+
+  // Integrate an exponential pitch dive for a stable 909-like body.
+  const pitchDecay = 34
+  const phaseCycles =
+    48 * phase + (118 / pitchDecay) * (1 - Math.exp(-pitchDecay * phase))
+  const body = Math.sin(Math.PI * 2 * phaseCycles) * Math.exp(-phase * 15)
+  const knock =
+    Math.sin(Math.PI * 2 * 112 * phase) * Math.exp(-phase * 42) * 0.34
+  const click = phase < 0.012 ? white * Math.exp(-phase * 260) * 0.2 : 0
+  const rumble =
+    phase > 0.075
+      ? Math.sin(Math.PI * 2 * 47 * (phase - 0.075)) *
+        Math.exp(-(phase - 0.075) * 7.2) *
+        0.2
+      : 0
+
+  return Math.tanh((body + knock + click + rumble) * 1.75) * 0.86
+}
+
 /** Synthesizes a muted metronomic tape pulse. */
 function renderPulseSample(time: number, pink: number) {
   const pulsePhase = time % (60 / 68)
@@ -828,6 +861,33 @@ function renderSynthSample(time: number) {
       0,
     ) * envelope
   )
+}
+
+/** Synthesizes a warm 303-inspired bass phrase at a 130 BPM native tempo. */
+function renderAcidSynthSample(time: number) {
+  const stepLength = 60 / 130 / 4
+  const step = Math.floor(time / stepLength) % 32
+  const phase = time % stepLength
+  if (step % 8 === 6) return 0
+
+  const phraseStep = step % ACID_SYNTH_SEMITONES.length
+  const frequency = 55 * 2 ** (ACID_SYNTH_SEMITONES[phraseStep] / 12)
+  const accent = step % 8 === 0 || step % 8 === 5 ? 1 : 0.62
+  const envelope =
+    Math.min(1, phase / 0.004) * Math.exp(-phase * (8.5 - accent * 2.5))
+  const sweep = Math.exp(-phase * 24) * accent
+
+  // A moving harmonic balance evokes a resonant low-pass sweep without
+  // requiring a separate filter node per sequencer step.
+  const fundamental = Math.sin(Math.PI * 2 * frequency * time)
+  const second =
+    Math.sin(Math.PI * 4 * frequency * time + sweep * 0.8) *
+    (0.28 + sweep * 0.26)
+  const third =
+    Math.sin(Math.PI * 6 * frequency * time + sweep * 1.3) *
+    (0.1 + sweep * 0.18)
+
+  return Math.tanh((fundamental + second + third) * 1.35) * envelope * 0.62
 }
 
 /** Synthesizes widely spaced, bell-like keyboard notes. */

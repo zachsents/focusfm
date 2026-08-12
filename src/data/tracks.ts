@@ -26,6 +26,7 @@ export const TRACK_IDS = [
   "distant-thunder",
   "gull-calls",
   "soft-drums",
+  "acid-techno-kick",
   "brushed-shaker",
   "tape-pulse",
   "slow-hop-loop",
@@ -43,6 +44,7 @@ export const TRACK_IDS = [
   "binaural-deep-focus",
   "soft-drone",
   "warm-synth",
+  "acid-synth",
   "distant-keys",
 ] as const
 
@@ -251,6 +253,14 @@ export const TRACK_LIBRARY: readonly TrackDefinition[] = [
     nativeBpm: 76,
   },
   {
+    id: "acid-techno-kick",
+    name: "Acid techno kick",
+    description: "Driving four-on-the-floor with a dark rumble",
+    category: "rhythm",
+    source: "generated",
+    nativeBpm: 130,
+  },
+  {
     id: "brushed-shaker",
     name: "Brushed shaker",
     description: "Loose sixteenths with a soft swing",
@@ -380,6 +390,14 @@ export const TRACK_LIBRARY: readonly TrackDefinition[] = [
     description: "Slowly shifting major sevenths",
     category: "tone",
     source: "generated",
+  },
+  {
+    id: "acid-synth",
+    name: "Acid synth",
+    description: "Warm resonant bass sequence with gentle accents",
+    category: "tone",
+    source: "generated",
+    nativeBpm: 130,
   },
   {
     id: "distant-keys",
