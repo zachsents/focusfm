@@ -299,8 +299,10 @@ export class AudioEngine {
       now,
       0.03,
     )
-    managedChannel.lowShelf.gain.setTargetAtTime(-channel.tone * 9, now, 0.04)
-    managedChannel.highShelf.gain.setTargetAtTime(channel.tone * 9, now, 0.04)
+    const tone =
+      channel.tone + (channel.trackId === "acid-techno-kick" ? -1 : 0)
+    managedChannel.lowShelf.gain.setTargetAtTime(-tone * 9, now, 0.04)
+    managedChannel.highShelf.gain.setTargetAtTime(tone * 9, now, 0.04)
   }
 
   /** Sets the output level with a short de-clicking ramp. */
@@ -825,11 +827,14 @@ function renderAcidTechnoKickSamples(
   sampleRate: number,
 ) {
   const beatLength = 60 / 130
-  const delay = new Float32Array(Math.floor(sampleRate * 0.092))
+  const delay = new Float32Array(Math.floor(sampleRate * 0.138))
+  const echo = new Float32Array(Math.floor(sampleRate * beatLength * 0.75))
   const random = createRandom(hashString("acid-techno-kick"))
   let delayIndex = 0
+  let echoIndex = 0
   let rumbleLowPass = 0
   let previousRumbleLowPass = 0
+  let echoLowPass = 0
 
   // The first pass settles the feedback path so the rendered loop joins
   // seamlessly instead of restarting its reverb tail at every boundary.
@@ -853,20 +858,27 @@ function renderAcidTechnoKickSamples(
         : 0
     const click =
       phase < 0.009 ? (random() * 2 - 1) * Math.exp(-phase * 310) * 0.22 : 0
-    const dry = Math.tanh((body + knock + click) * 2.7)
+    const dry = Math.tanh((body + knock + click) * 1.72)
 
     const delayed = delay[delayIndex]
-    const feedback = Math.tanh(delayed * 1.9) * 0.73
-    delay[delayIndex] = dry * 0.62 + feedback
+    const feedback = Math.tanh(delayed * 1.15) * 0.46
+    delay[delayIndex] = dry * 0.48 + feedback
     delayIndex = (delayIndex + 1) % delay.length
 
     // Two gentle one-pole stages darken the feedback into a warehouse-style
     // low rumble while the sidechain curve leaves room for the next transient.
-    rumbleLowPass += (delayed - rumbleLowPass) * 0.035
-    previousRumbleLowPass += (rumbleLowPass - previousRumbleLowPass) * 0.022
+    rumbleLowPass += (delayed - rumbleLowPass) * 0.018
+    previousRumbleLowPass += (rumbleLowPass - previousRumbleLowPass) * 0.012
     const duck = Math.min(1, Math.max(0, (phase - 0.045) / 0.12))
-    const rumble = Math.tanh(previousRumbleLowPass * 4.2) * duck * 0.68
-    const output = Math.tanh((dry * 0.92 + rumble) * 1.18) * 0.82
+    const rumble = Math.tanh(previousRumbleLowPass * 2.5) * duck * 0.78
+
+    const echoed = echo[echoIndex]
+    echoLowPass += (echoed - echoLowPass) * 0.04
+    echo[echoIndex] = dry * 0.16 + rumble * 0.38 + echoLowPass * 0.3
+    echoIndex = (echoIndex + 1) % echo.length
+
+    const output =
+      Math.tanh((dry * 0.9 + rumble * 0.68 + echoLowPass * 0.34) * 0.94) * 0.84
 
     if (index >= samples.length) samples[loopIndex] = output
   }
@@ -907,13 +919,19 @@ function renderSynthSample(time: number) {
 /** Renders a driven, resonant 303-style sequence at a 130 BPM native tempo. */
 function renderAcidSynthSamples(samples: Float32Array, sampleRate: number) {
   const stepLength = 60 / 130 / 4
+  const echo = new Float32Array(Math.floor(stepLength * 3 * sampleRate))
   let oscillatorPhase = 0
   let frequency = 55
   let filterState1 = 0
   let filterState2 = 0
+  let echoIndex = 0
+  let echoLowPass = 0
 
-  samples.forEach((_, index) => {
-    const time = index / sampleRate
+  // Render twice so the oscillator, filter, and echo are already settled when
+  // the saved pass begins, making the repeated buffer feel continuous.
+  for (let index = 0; index < samples.length * 2; index += 1) {
+    const loopIndex = index % samples.length
+    const time = loopIndex / sampleRate
     const absoluteStep = Math.floor(time / stepLength)
     const step = absoluteStep % ACID_SYNTH_SEMITONES.length
     const stepPhase = time % stepLength
@@ -959,8 +977,18 @@ function renderAcidSynthSamples(samples: Float32Array, sampleRate: number) {
     filterState2 = 2 * low - filterState2
 
     const acid = low * 0.8 + band * (accent ? 0.32 : 0.2)
-    samples[index] = Math.tanh(acid * 3.4) * ampEnvelope * 0.7
-  })
+    const dry = Math.tanh(acid * 3.4) * ampEnvelope
+    const delayed = echo[echoIndex]
+    echoLowPass += (delayed - echoLowPass) * 0.075
+    echo[echoIndex] = dry * 0.72 + Math.tanh(echoLowPass * 1.35) * 0.52
+    echoIndex = (echoIndex + 1) % echo.length
+
+    // The dark three-sixteenth echo behaves like a compact room tail: it
+    // fills pattern rests and blends the line without washing out the attack.
+    const wet = Math.tanh(echoLowPass * 1.8)
+    const output = Math.tanh((dry * 0.72 + wet * 0.38) * 1.08) * 0.7
+    if (index >= samples.length) samples[loopIndex] = output
+  }
 }
 
 /** Synthesizes widely spaced, bell-like keyboard notes. */
