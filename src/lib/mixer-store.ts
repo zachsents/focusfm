@@ -202,7 +202,10 @@ export function dismissSharedMix() {
   if (typeof window === "undefined") return
 
   const url = new URL(window.location.href)
-  if (url.search.startsWith("?mix-")) {
+  if (url.pathname.startsWith("/mix/")) {
+    url.pathname = "/"
+    url.search = ""
+  } else if (url.search.startsWith("?mix-")) {
     url.search = ""
   } else {
     url.searchParams.delete("mix")

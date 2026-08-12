@@ -15,7 +15,7 @@ import { dismissSharedMix, usePendingSharedMix } from "#/lib/mixer-store"
 export const Route = createFileRoute("/")({ component: Home })
 
 /** Renders the complete local-first focus audio mixing desk. */
-function Home() {
+export function Home() {
   const mixer = useFocusMixer()
   const pendingSharedMix = usePendingSharedMix()
   const activeTrackIds = new Set<TrackId>(
