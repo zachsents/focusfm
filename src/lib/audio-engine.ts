@@ -11,6 +11,7 @@ import type { MixerChannel } from "#/lib/mixer-store"
 import {
   NEURAL_MODULATION_DEPTHS,
   NEURAL_MODULATION_FREQUENCIES,
+  NEURAL_STEREO_DEPTHS,
   type NeuralModulationSettings,
 } from "#/lib/neural-modulation"
 import { BEATS_PER_BAR, clampBpm, DEFAULT_BPM } from "#/lib/transport"
@@ -83,7 +84,7 @@ const TRACK_LEVELS: Record<TrackId, number> = {
   "binaural-deep-focus": 0.2,
   "soft-drone": 0.24,
   "warm-synth": 0.34,
-  "acid-synth": 0.3,
+  "acid-synth": 0.2,
   "distant-keys": 0.42,
 }
 
@@ -133,6 +134,7 @@ export class AudioEngine {
   private modulationGain: GainNode | undefined
   private modulationDepth: GainNode | undefined
   private modulationOscillator: OscillatorNode | undefined
+  private stereoModulationDepth: GainNode | undefined
   private channels = new Map<string, ManagedChannel>()
   private pendingChannels = new Map<
     string,
@@ -165,14 +167,21 @@ export class AudioEngine {
     modulationGain.gain.value = 1
     const modulationDepth = context.createGain()
     modulationDepth.gain.value = 0
+    const stereoModulationDepth = context.createGain()
+    stereoModulationDepth.gain.value = 0
+    const stereoModulationPanner = context.createStereoPanner()
     const modulationOscillator = context.createOscillator()
     modulationOscillator.type = "sine"
     modulationOscillator.frequency.value = 10
     modulationOscillator.connect(modulationDepth).connect(modulationGain.gain)
+    modulationOscillator
+      .connect(stereoModulationDepth)
+      .connect(stereoModulationPanner.pan)
     modulationOscillator.start()
 
     mixBus
       .connect(modulationGain)
+      .connect(stereoModulationPanner)
       .connect(masterGain)
       .connect(context.destination)
     this.context = context
@@ -181,6 +190,7 @@ export class AudioEngine {
     this.modulationGain = modulationGain
     this.modulationDepth = modulationDepth
     this.modulationOscillator = modulationOscillator
+    this.stereoModulationDepth = stereoModulationDepth
     return { context, masterGain, mixBus }
   }
 
@@ -317,6 +327,10 @@ export class AudioEngine {
     const frequency = NEURAL_MODULATION_FREQUENCIES[settings.mode]
     const depth =
       settings.mode === "off" ? 0 : NEURAL_MODULATION_DEPTHS[settings.intensity]
+    const stereoDepth =
+      settings.mode === "off" || !settings.stereo
+        ? 0
+        : NEURAL_STEREO_DEPTHS[settings.intensity]
     const now = context.currentTime
 
     this.modulationOscillator?.frequency.setTargetAtTime(
@@ -326,6 +340,7 @@ export class AudioEngine {
     )
     this.modulationGain?.gain.setTargetAtTime(1 - depth / 2, now, 0.04)
     this.modulationDepth?.gain.setTargetAtTime(depth / 2, now, 0.04)
+    this.stereoModulationDepth?.gain.setTargetAtTime(stereoDepth, now, 0.04)
   }
 
   /** Changes every rhythmic channel's tempo while preserving pitch and phase. */
@@ -874,11 +889,11 @@ function renderAcidTechnoKickSamples(
 
     const echoed = echo[echoIndex]
     echoLowPass += (echoed - echoLowPass) * 0.04
-    echo[echoIndex] = dry * 0.16 + rumble * 0.38 + echoLowPass * 0.3
+    echo[echoIndex] = rumble * 0.42 + echoLowPass * 0.22
     echoIndex = (echoIndex + 1) % echo.length
 
     const output =
-      Math.tanh((dry * 0.9 + rumble * 0.68 + echoLowPass * 0.34) * 0.94) * 0.84
+      Math.tanh((dry * 0.9 + rumble * 0.68 + echoLowPass * 0.24) * 0.94) * 0.84
 
     if (index >= samples.length) samples[loopIndex] = output
   }

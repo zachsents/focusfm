@@ -2,6 +2,7 @@ import { IconWaveformLinesOutlineDuo18 } from "nucleo-ui-outline-duo-18"
 
 import { Badge } from "#/components/ui/badge"
 import { Button } from "#/components/ui/button"
+import { Toggle } from "#/components/ui/toggle"
 import {
   Popover,
   PopoverContent,
@@ -153,10 +154,36 @@ export function NeuralModulationPanel({
           </ToggleGroup>
         </fieldset>
 
+        <fieldset
+          className="grid gap-2 disabled:pointer-events-none disabled:opacity-40"
+          disabled={settings.mode === "off"}
+        >
+          <legend className="mb-1 text-xs font-bold tracking-[0.08em] text-[var(--ink-soft)] uppercase">
+            Stereo
+          </legend>
+          <Toggle
+            className="h-auto min-h-12 w-full justify-between rounded-[0.7rem] px-3 text-left"
+            variant="skeuomorphic"
+            pressed={settings.stereo}
+            onPressedChange={(stereo) => onChange({ ...settings, stereo })}
+            aria-label="Toggle left and right neural modulation"
+          >
+            <span className="grid gap-0.5">
+              <span className="text-[0.7rem] font-bold">L/R modulation</span>
+              <span className="text-[0.6rem] font-normal opacity-65">
+                Alternate musical layers across the stereo field
+              </span>
+            </span>
+            <span className="text-[0.62rem] font-bold tracking-[0.08em] uppercase">
+              {settings.stereo ? "On" : "Off"}
+            </span>
+          </Toggle>
+        </fieldset>
+
         <p className="text-[0.65rem] leading-relaxed text-[var(--ink-soft)]">
           {settings.mode === "off"
             ? "Choose a mode, then start with Balanced."
-            : `${activeMode?.name} applies ${activeFrequency} Hz modulation at ${activeDepth}% depth to synth, drone, keys, and rhythm layers.`}
+            : `${activeMode?.name} applies ${activeFrequency} Hz modulation at ${activeDepth}% depth to synth, drone, keys, and rhythm layers${settings.stereo ? ", with synchronized L/R movement" : ""}.`}
         </p>
       </PopoverContent>
     </Popover>
