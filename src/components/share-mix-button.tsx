@@ -1,5 +1,5 @@
 import { IconCheck, IconLink } from "nucleo-micro-bold"
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
 import { Button } from "#/components/ui/button"
 import type { MixerSnapshot } from "#/lib/mixer-store"
@@ -10,16 +10,27 @@ interface ShareMixButtonProps {
 }
 
 /**
- * Copies a URL that recreates the currently audible mix without storing it
- * remotely.
+ * Shares a URL that recreates the currently audible mix without storing it
+ * remotely. The native share sheet keeps the entire stateful URL together in
+ * apps such as Messages; copying is retained as a fallback.
  */
 export function ShareMixButton({ snapshot }: ShareMixButtonProps) {
-  const [status, setStatus] = useState<"copied" | "failed" | undefined>(
-    undefined,
-  )
+  const [status, setStatus] = useState<
+    "shared" | "copied" | "failed" | undefined
+  >(undefined)
   const resetTimeoutRef = useRef<number | undefined>(undefined)
 
-  const copyShareLink = async () => {
+  useEffect(() => () => window.clearTimeout(resetTimeoutRef.current), [])
+
+  const resetStatusAfterDelay = () => {
+    window.clearTimeout(resetTimeoutRef.current)
+    resetTimeoutRef.current = window.setTimeout(
+      () => setStatus(undefined),
+      2_000,
+    )
+  }
+
+  const shareMix = async () => {
     const shareUrl = createShareUrl(
       {
         version: 1,
@@ -39,21 +50,30 @@ export function ShareMixButton({ snapshot }: ShareMixButtonProps) {
       window.location,
     )
 
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: "Focus FM mix", url: shareUrl })
+        setStatus("shared")
+        resetStatusAfterDelay()
+      } catch (error) {
+        // Closing the system share sheet is not an error the UI needs to report.
+        if (error instanceof DOMException && error.name === "AbortError") return
+        setStatus("failed")
+        resetStatusAfterDelay()
+      }
+      return
+    }
+
     try {
       await navigator.clipboard.writeText(shareUrl)
       setStatus("copied")
     } catch {
       setStatus("failed")
     }
-
-    window.clearTimeout(resetTimeoutRef.current)
-    resetTimeoutRef.current = window.setTimeout(
-      () => setStatus(undefined),
-      2_000,
-    )
+    resetStatusAfterDelay()
   }
 
-  const isCopied = status === "copied"
+  const didShare = status === "shared" || status === "copied"
 
   return (
     <Button
@@ -61,16 +81,22 @@ export function ShareMixButton({ snapshot }: ShareMixButtonProps) {
       variant="skeuomorphic"
       size="lg"
       type="button"
-      onClick={() => void copyShareLink()}
+      onClick={() => void shareMix()}
     >
-      {isCopied ? <IconCheck /> : <IconLink />}
-      {isCopied ? "Copied" : "Share"}
+      {didShare ? <IconCheck /> : <IconLink />}
+      {status === "shared"
+        ? "Shared"
+        : status === "copied"
+          ? "Copied"
+          : "Share"}
       <span className="sr-only" aria-live="polite">
-        {status === "copied"
-          ? "Share link copied to clipboard."
-          : status === "failed"
-            ? "Could not copy the share link."
-            : ""}
+        {status === "shared"
+          ? "Mix shared."
+          : status === "copied"
+            ? "Share link copied to clipboard."
+            : status === "failed"
+              ? "Could not copy the share link."
+              : ""}
       </span>
     </Button>
   )
