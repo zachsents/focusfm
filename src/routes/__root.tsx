@@ -21,6 +21,46 @@ export const Route = createRootRoute({
         content: "Layer focus sounds in a clean, browser-based audio mixer.",
       },
       {
+        property: "og:title",
+        content: "Focus FM",
+      },
+      {
+        property: "og:description",
+        content: "Layer focus sounds in a clean, browser-based audio mixer.",
+      },
+      {
+        property: "og:type",
+        content: "website",
+      },
+      {
+        property: "og:url",
+        content: "https://focusfm.vercel.app/",
+      },
+      {
+        property: "og:image",
+        content: "https://focusfm.vercel.app/opengraph.png",
+      },
+      {
+        property: "og:image:width",
+        content: "2880",
+      },
+      {
+        property: "og:image:height",
+        content: "1620",
+      },
+      {
+        property: "og:image:alt",
+        content: "Four friends together in a car.",
+      },
+      {
+        name: "twitter:card",
+        content: "summary_large_image",
+      },
+      {
+        name: "twitter:image",
+        content: "https://focusfm.vercel.app/opengraph.png",
+      },
+      {
         title: "Focus FM",
       },
     ],
