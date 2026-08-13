@@ -4,6 +4,7 @@ import { ChannelStrip } from "#/components/channel-strip"
 import { ChangelogPopover } from "#/components/changelog-popover"
 import { ConfirmSharedMixDialog } from "#/components/confirm-shared-mix-dialog"
 import { MasterDock } from "#/components/master-dock"
+import { MeditationChimePanel } from "#/components/meditation-chime-panel"
 import { NeuralModulationPanel } from "#/components/neural-modulation-panel"
 import { PresetControls } from "#/components/preset-controls"
 import { ShareMixButton } from "#/components/share-mix-button"
@@ -53,6 +54,11 @@ export function Home() {
           className="flex items-center justify-end gap-[0.55rem]"
           aria-label="Mixer actions"
         >
+          <MeditationChimePanel
+            settings={mixer.meditationChime}
+            onChange={mixer.setMeditationChime}
+            onPreview={mixer.previewMeditationChime}
+          />
           <NeuralModulationPanel
             settings={mixer.neuralModulation}
             onChange={mixer.setNeuralModulation}

@@ -12,6 +12,7 @@ import {
 } from "#/lib/mixer-store"
 import type { SharedMix } from "#/lib/share-mix"
 import type { NeuralModulationSettings } from "#/lib/neural-modulation"
+import type { MeditationChimeSettings } from "#/lib/meditation-chime"
 import { clampBpm } from "#/lib/transport"
 
 /** Writes a complete mixer state to the local external store. */
@@ -71,6 +72,7 @@ export function useFocusMixer() {
         snapshot.masterVolume,
         snapshot.bpm,
         snapshot.neuralModulation,
+        snapshot.meditationChime,
       )
       setPlaybackState(true)
     } catch {
@@ -206,6 +208,16 @@ export function useFocusMixer() {
     if (isPlaying) engineRef.current?.setNeuralModulation(neuralModulation)
   }
 
+  const setMeditationChime = (meditationChime: MeditationChimeSettings) => {
+    updateSnapshot({ ...snapshot, meditationChime })
+    if (isPlaying) engineRef.current?.setMeditationChime(meditationChime)
+  }
+
+  const previewMeditationChime = () => {
+    const engine = (engineRef.current ??= new AudioEngine())
+    engine.previewMeditationChime()
+  }
+
   const tapTempo = () => {
     const now = performance.now()
     const previousTap = tempoTapTimesRef.current.at(-1)
@@ -324,6 +336,8 @@ export function useFocusMixer() {
     setMasterVolume,
     setBpm,
     setNeuralModulation,
+    setMeditationChime,
+    previewMeditationChime,
     tapTempo,
     savePreset,
     loadPreset: applyPreset,

@@ -8,6 +8,7 @@ import {
   type BinauralTone,
 } from "#/lib/binaural"
 import type { MixerChannel } from "#/lib/mixer-store"
+import type { MeditationChimeSettings } from "#/lib/meditation-chime"
 import {
   NEURAL_MODULATION_DEPTHS,
   NEURAL_MODULATION_FREQUENCIES,
@@ -148,6 +149,7 @@ export class AudioEngine {
   private previewGain: GainNode | undefined
   private previewSource: AudioBufferSourceNode | undefined
   private previewRequest = 0
+  private meditationChimeTimer: ReturnType<typeof setInterval> | undefined
 
   /** Creates the audio graph on the first user gesture. */
   private ensureContext() {
@@ -213,6 +215,7 @@ export class AudioEngine {
     masterVolume: number,
     bpm: number,
     neuralModulation: NeuralModulationSettings,
+    meditationChime: MeditationChimeSettings,
   ) {
     const { context } = this.ensureContext()
     this.setBpm(bpm)
@@ -224,10 +227,12 @@ export class AudioEngine {
     this.setNeuralModulation(neuralModulation)
     await this.syncChannels(channels)
     await context.resume()
+    this.setMeditationChime(meditationChime)
   }
 
   /** Pauses audio without throwing away the generated graph. */
   async pause() {
+    this.clearMeditationChimeTimer()
     await this.context?.suspend()
   }
 
@@ -338,6 +343,79 @@ export class AudioEngine {
     this.modulationGain?.gain.setTargetAtTime(1 - depth / 2, now, 0.04)
     this.modulationDepth?.gain.setTargetAtTime(depth / 2, now, 0.04)
     this.stereoModulationDepth?.gain.setTargetAtTime(stereoDepth, now, 0.04)
+  }
+
+  /** Resets the audio-only presence-bell countdown from the current moment. */
+  setMeditationChime(settings: MeditationChimeSettings) {
+    this.clearMeditationChimeTimer()
+    if (!settings.enabled || this.context?.state !== "running") return
+
+    this.meditationChimeTimer = setInterval(() => {
+      if (this.context && this.masterGain) {
+        this.playMeditationChime(this.context, this.masterGain)
+      }
+    }, settings.intervalMinutes * 60_000)
+  }
+
+  /** Sounds one singing-bowl strike for preview or a scheduled reminder. */
+  previewMeditationChime() {
+    const { context, gain } = this.ensurePreviewContext()
+    void context.resume().then(() => this.playMeditationChime(context, gain))
+  }
+
+  /** Clears the reminder so Play always begins a fresh interval. */
+  private clearMeditationChimeTimer() {
+    if (this.meditationChimeTimer) clearInterval(this.meditationChimeTimer)
+    this.meditationChimeTimer = undefined
+  }
+
+  /** Synthesizes a softly struck bowl with inharmonic partials and echoes. */
+  private playMeditationChime(context: AudioContext, output: AudioNode) {
+    if (context.state !== "running") return
+
+    const now = context.currentTime
+    const bowlGain = context.createGain()
+    const echo = context.createDelay(1)
+    const echoFeedback = context.createGain()
+    const echoLevel = context.createGain()
+    bowlGain.gain.value = 0.26
+    echo.delayTime.value = 0.42
+    echoFeedback.gain.value = 0.24
+    echoLevel.gain.value = 0.22
+    bowlGain.connect(output)
+    bowlGain.connect(echo)
+    echo.connect(echoFeedback).connect(echo)
+    echo.connect(echoLevel).connect(output)
+
+    const partials = [
+      [196, 1],
+      [312, 0.46],
+      [477, 0.28],
+      [731, 0.14],
+    ] as const
+    for (const [frequency, level] of partials) {
+      const oscillator = context.createOscillator()
+      const gain = context.createGain()
+      oscillator.type = "sine"
+      oscillator.frequency.setValueAtTime(frequency, now)
+      oscillator.frequency.exponentialRampToValueAtTime(
+        frequency * 0.997,
+        now + 7,
+      )
+      gain.gain.setValueAtTime(0.0001, now)
+      gain.gain.exponentialRampToValueAtTime(level, now + 0.012)
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 7)
+      oscillator.connect(gain).connect(bowlGain)
+      oscillator.start(now)
+      oscillator.stop(now + 7.1)
+    }
+
+    setTimeout(() => {
+      bowlGain.disconnect()
+      echo.disconnect()
+      echoFeedback.disconnect()
+      echoLevel.disconnect()
+    }, 8_000)
   }
 
   /** Changes every rhythmic channel's tempo while preserving pitch and phase. */

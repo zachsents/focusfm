@@ -8,6 +8,10 @@ import {
   NEURAL_MODULATION_MODES,
 } from "#/lib/neural-modulation"
 import { getSharedMixFromLocation, type SharedMix } from "#/lib/share-mix"
+import {
+  DEFAULT_MEDITATION_CHIME,
+  MEDITATION_CHIME_INTERVALS,
+} from "#/lib/meditation-chime"
 import { DEFAULT_BPM, MAX_BPM, MIN_BPM } from "#/lib/transport"
 
 const channelSchema = z.object({
@@ -35,12 +39,20 @@ const neuralModulationSchema = z.object({
   stereoDepth: z.number().min(0).max(1).default(0.45),
 })
 
+const meditationChimeSchema = z.object({
+  enabled: z.boolean(),
+  intervalMinutes: z.union(
+    MEDITATION_CHIME_INTERVALS.map((minutes) => z.literal(minutes)),
+  ),
+})
+
 const mixerSnapshotSchema = z.object({
   version: z.literal(1),
   channels: z.array(channelSchema),
   masterVolume: z.number().min(0).max(1),
   bpm: z.number().min(MIN_BPM).max(MAX_BPM).default(DEFAULT_BPM),
   neuralModulation: neuralModulationSchema.default(DEFAULT_NEURAL_MODULATION),
+  meditationChime: meditationChimeSchema.default(DEFAULT_MEDITATION_CHIME),
   presets: z.array(presetSchema),
   activePresetId: z.string().nullable().default(null),
 })
@@ -56,6 +68,7 @@ const DEFAULT_SNAPSHOT: MixerSnapshot = {
   masterVolume: 0.72,
   bpm: DEFAULT_BPM,
   neuralModulation: DEFAULT_NEURAL_MODULATION,
+  meditationChime: DEFAULT_MEDITATION_CHIME,
   activePresetId: null,
   channels: [
     {
@@ -123,6 +136,7 @@ const SERVER_SNAPSHOT: MixerSnapshot = {
   masterVolume: DEFAULT_SNAPSHOT.masterVolume,
   bpm: DEFAULT_SNAPSHOT.bpm,
   neuralModulation: DEFAULT_NEURAL_MODULATION,
+  meditationChime: DEFAULT_MEDITATION_CHIME,
   activePresetId: null,
   channels: [],
   presets: [],
