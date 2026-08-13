@@ -25,6 +25,15 @@ function matchesPreset(snapshot: MixerSnapshot, preset: MixerPreset) {
   return (
     snapshot.masterVolume === preset.masterVolume &&
     snapshot.bpm === preset.bpm &&
+    snapshot.neuralModulation.mode === preset.neuralModulation.mode &&
+    snapshot.neuralModulation.intensity ===
+      preset.neuralModulation.intensity &&
+    snapshot.neuralModulation.stereo === preset.neuralModulation.stereo &&
+    snapshot.neuralModulation.stereoDepth ===
+      preset.neuralModulation.stereoDepth &&
+    snapshot.meditationChime.enabled === preset.meditationChime.enabled &&
+    snapshot.meditationChime.intervalMinutes ===
+      preset.meditationChime.intervalMinutes &&
     snapshot.channels.length === preset.channels.length &&
     snapshot.channels.every((channel, index) => {
       const presetChannel = preset.channels[index]
@@ -244,6 +253,8 @@ export function useFocusMixer() {
       channels: snapshot.channels.map((channel) => ({ ...channel })),
       masterVolume: snapshot.masterVolume,
       bpm: snapshot.bpm,
+      neuralModulation: { ...snapshot.neuralModulation },
+      meditationChime: { ...snapshot.meditationChime },
     }
     updateSnapshot({
       ...snapshot,
@@ -262,12 +273,16 @@ export function useFocusMixer() {
       channels,
       masterVolume: preset.masterVolume,
       bpm: preset.bpm,
+      neuralModulation: { ...preset.neuralModulation },
+      meditationChime: { ...preset.meditationChime },
       activePresetId: preset.id,
     })
     if (isPlaying) {
       void engineRef.current?.syncChannels(channels)
       engineRef.current?.setMasterVolume(preset.masterVolume)
       engineRef.current?.setBpm(preset.bpm)
+      engineRef.current?.setNeuralModulation(preset.neuralModulation)
+      engineRef.current?.setMeditationChime(preset.meditationChime)
     }
   }
 
@@ -278,6 +293,8 @@ export function useFocusMixer() {
       channels: snapshot.channels.map((channel) => ({ ...channel })),
       masterVolume: snapshot.masterVolume,
       bpm: snapshot.bpm,
+      neuralModulation: { ...snapshot.neuralModulation },
+      meditationChime: { ...snapshot.meditationChime },
     }
     updateSnapshot({
       ...snapshot,

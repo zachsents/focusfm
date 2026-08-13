@@ -119,6 +119,7 @@ const RECORDED_TRACK_URLS: Partial<Record<TrackId, string>> = {
 
 const bufferCache = new Map<TrackId, Promise<AudioBuffer>>()
 const PREVIEW_VOLUME = 0.7
+const PLAY_FADE_SECONDS = 0.22
 const ACID_SYNTH_SEMITONES = [
   0, 0, 12, 3, 0, 7, 10, 3, 0, 12, 7, 15, 0, 10, 7, 3,
 ] as const
@@ -223,9 +224,15 @@ export class AudioEngine {
       this.transportAnchorTime = context.currentTime + 0.12
       this.transportAnchorBeat = 0
     }
-    this.setMasterVolume(masterVolume)
     this.setNeuralModulation(neuralModulation)
     await this.syncChannels(channels)
+    const now = context.currentTime
+    this.masterGain?.gain.cancelScheduledValues(now)
+    this.masterGain?.gain.setValueAtTime(0, now)
+    this.masterGain?.gain.linearRampToValueAtTime(
+      masterVolume,
+      now + PLAY_FADE_SECONDS,
+    )
     await context.resume()
     this.setMeditationChime(meditationChime)
   }

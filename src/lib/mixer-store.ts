@@ -24,14 +24,6 @@ const channelSchema = z.object({
   solo: z.boolean().default(false),
 })
 
-const presetSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  channels: z.array(channelSchema),
-  masterVolume: z.number().min(0).max(1),
-  bpm: z.number().min(MIN_BPM).max(MAX_BPM).default(DEFAULT_BPM),
-})
-
 const neuralModulationSchema = z.object({
   mode: z.enum(NEURAL_MODULATION_MODES),
   intensity: z.enum(NEURAL_MODULATION_INTENSITIES),
@@ -44,6 +36,16 @@ const meditationChimeSchema = z.object({
   intervalMinutes: z.union(
     MEDITATION_CHIME_INTERVALS.map((minutes) => z.literal(minutes)),
   ),
+})
+
+const presetSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  channels: z.array(channelSchema),
+  masterVolume: z.number().min(0).max(1),
+  bpm: z.number().min(MIN_BPM).max(MAX_BPM).default(DEFAULT_BPM),
+  neuralModulation: neuralModulationSchema.default(DEFAULT_NEURAL_MODULATION),
+  meditationChime: meditationChimeSchema.default(DEFAULT_MEDITATION_CHIME),
 })
 
 const mixerSnapshotSchema = z.object({
